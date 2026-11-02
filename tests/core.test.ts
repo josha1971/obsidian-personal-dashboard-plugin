@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { insertCaptureLine, parseCapture, formatCaptureLine, parseDuration, formatDuration } from "../src/parser";
 import { parseTaskLine, toggleLine } from "../src/tasks";
 import { parseDateToken, isoWeek, friendlyDate } from "../src/dates";
+import { isFlagged } from "../src/favorites";
 import { DEFAULT_LOG_TYPES, buildLogNote, parseLogTypes, yamlString } from "../src/logs";
 
 // Monday 2 November 2026
@@ -119,5 +120,16 @@ describe("insertCaptureLine", () => {
   });
   it("does not treat a lower heading as the title", () => {
     expect(insertCaptureLine("## Today\n- a\n", "- new", "top")).toBe("- new\n## Today\n- a\n");
+  });
+});
+
+describe("favorites", () => {
+  it("reads yes-like values", () => {
+    expect(isFlagged(true)).toBe(true);
+    expect(isFlagged("true")).toBe(true);
+    expect(isFlagged("Yes")).toBe(true);
+    expect(isFlagged(false)).toBe(false);
+    expect(isFlagged(undefined)).toBe(false);
+    expect(isFlagged("no")).toBe(false);
   });
 });

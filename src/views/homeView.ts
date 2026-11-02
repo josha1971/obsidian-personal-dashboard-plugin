@@ -4,7 +4,7 @@ import { DashView } from "./base";
 import { VIEW_HOME } from "../constants";
 import { daysBetween, friendlyDate, isoDate, isoWeek, parseISODate, startOfDay } from "../dates";
 import { InboxItem, LogEntry, TaskItem, readInbox } from "../store";
-import { chip, iconButton, renderCaptureBox, renderTaskRow, sectionCard } from "../ui";
+import { chip, iconButton, renderCaptureBox, renderTaskRow, sectionCard, starButton } from "../ui";
 
 interface NextStep {
   title: string;
@@ -95,6 +95,30 @@ export class HomeView extends DashView {
     } else {
       for (const l of recent) this.renderLogRow(rl.body, l, today);
     }
+
+    this.renderFavorites(el);
+  }
+
+  private renderFavorites(parent: HTMLElement): void {
+    const favs = this.plugin.getFavorites();
+    const card = sectionCard(parent, "Favorites", favs.length ? `${favs.length} ${favs.length === 1 ? "note" : "notes"}` : "", "pd-tone-gold");
+    if (!favs.length) {
+      card.body.createDiv({ cls: "pd-empty", text: "Nothing here yet. Open a note, then use the command Toggle favorite for this note, or the note's ... menu, or the star in Logs." });
+      return;
+    }
+    const grid = card.body.createDiv({ cls: "pd-favgrid" });
+    for (const f of favs.slice(0, 40)) {
+      const item = grid.createDiv({ cls: "pd-fav" });
+      const name = item.createDiv({ cls: "pd-fav-main" });
+      name.createDiv({ text: f.file.basename, cls: "pd-fav-name" });
+      const sub = name.createDiv({ cls: "pd-fav-sub" });
+      if (f.category) chip(sub, f.category, "is-type");
+      if (f.file.parent && !f.file.parent.isRoot()) sub.createSpan({ text: f.file.parent.name, cls: "pd-muted" });
+      name.addEventListener("click", () => void this.plugin.openFile(f.file));
+      setTooltip(name, `Open ${f.file.path}`, { delay: 400 });
+      starButton(item, f.file, true, this.plugin);
+    }
+    if (favs.length > 40) card.body.createDiv({ cls: "pd-muted pd-summary", text: `Showing 40 of ${favs.length}.` });
   }
 
   private stat(parent: HTMLElement, value: string, label: string, onClick: () => void, tip: string, cls = ""): void {

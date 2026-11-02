@@ -4,7 +4,8 @@ import { DashView } from "./base";
 import { VIEW_LOGS } from "../constants";
 import { addDays, friendlyDate, isoDate, startOfDay } from "../dates";
 import { LogEntry } from "../store";
-import { chip, iconButton } from "../ui";
+import { chip, iconButton, starButton } from "../ui";
+import { isFlagged } from "../favorites";
 
 type Range = "30" | "90" | "180" | "365" | "all";
 type Sort = "newest" | "oldest" | "rating" | "name";
@@ -145,7 +146,7 @@ export class LogsView extends DashView {
     const today = new Date();
     const table = list.createEl("table", { cls: "pd-table" });
     const hr = table.createEl("thead").createEl("tr");
-    for (const h of ["When", "Name", "Kind", "Details", "Rating"]) hr.createEl("th", { text: h, cls: h === "Details" ? "pd-col-detail" : "" });
+    for (const h of ["When", "Name", "Kind", "Details", "Rating", ""]) hr.createEl("th", { text: h, cls: h === "Details" ? "pd-col-detail" : "" });
     const body = table.createEl("tbody");
     const wantExcerpts: { cell: HTMLElement; e: LogEntry }[] = [];
 
@@ -161,6 +162,7 @@ export class LogsView extends DashView {
       tr.createEl("td", { text: e.detail, cls: "pd-muted pd-col-detail" });
       const rt = tr.createEl("td", { cls: "pd-nowrap" });
       if (e.rating !== undefined) chip(rt, `${e.rating}/10`, "is-rating");
+      starButton(tr.createEl("td", { cls: "pd-nowrap" }), e.file, isFlagged(e.fm[this.plugin.settings.favoriteProperty]), this.plugin);
       tr.addEventListener("click", () => void this.plugin.openFile(e.file));
       setTooltip(tr, "Open this note", { delay: 600 });
     }

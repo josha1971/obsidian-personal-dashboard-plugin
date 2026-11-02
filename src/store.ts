@@ -4,6 +4,7 @@ import type { LogType } from "./logs";
 import { TaskInfo, parseTaskLine } from "./tasks";
 import { isoDate, parseISODate } from "./dates";
 import { insertCaptureLine } from "./parser";
+import { isFlagged } from "./favorites";
 
 type Frontmatter = Record<string, unknown>;
 
@@ -24,6 +25,12 @@ export interface LogEntry {
   /** Short summary of the main fields, e.g. "Italian · Old Town". */
   detail: string;
   fm: Frontmatter;
+}
+
+export interface FavoriteItem {
+  file: TFile;
+  /** The note's first category, e.g. "Books". */
+  category?: string;
 }
 
 export interface InboxItem {
@@ -88,6 +95,18 @@ export function collectLogs(app: App, settings: DashboardSettings): LogEntry[] {
     out.push({ file, type, date, rating, detail, fm });
   }
   return out;
+}
+
+/** Notes flagged as favorites. Not limited by the ignored folders, so category pages can be favorites too. */
+export function collectFavorites(app: App, settings: DashboardSettings): FavoriteItem[] {
+  const out: FavoriteItem[] = [];
+  for (const file of app.vault.getMarkdownFiles()) {
+    const fm = frontmatterOf(app, file);
+    if (!fm || !isFlagged(fm[settings.favoriteProperty])) continue;
+    const cat = [...asList(fm[settings.categoryProperty]), ...asList(fm["categories"])].map(linkTarget).find(Boolean);
+    out.push({ file, category: cat });
+  }
+  return out.sort((a, b) => a.file.basename.localeCompare(b.file.basename));
 }
 
 export async function collectTasks(app: App, settings: DashboardSettings): Promise<TaskItem[]> {

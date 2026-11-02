@@ -138,3 +138,17 @@
   .pd-title { font-size: 1.6em; }
   .pd-search { max-width: none; }
 }
+
+/* Favorites */
+.pd-tone-gold .pd-card-title { color: var(--color-orange); }
+.pd-favgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; padding: 8px 0 4px; }
+.pd-fav { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border: 1px solid var(--background-modifier-border); border-radius: 8px; }
+.pd-fav:hover { background: var(--background-modifier-hover); }
+.pd-fav-main { flex: 1; min-width: 0; cursor: pointer; }
+.pd-fav-name { font-weight: var(--font-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-fav-sub { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.pd-star { flex: none; width: 28px; height: 28px; padding: 0; border: none; background: transparent; box-shadow: none; cursor: pointer; color: var(--text-faint); display: inline-flex; align-items: center; justify-content: center; }
+.pd-star:hover { color: var(--color-orange); }
+.pd-star svg { width: 16px; height: 16px; }
+.pd-star.is-on { color: var(--color-orange); }
+.pd-star.is-on svg { fill: currentColor; }

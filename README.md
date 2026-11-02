@@ -6,6 +6,7 @@ A rule-based dashboard for a mostly folderless vault. No AI, no network access.
 - **Capture**: one line becomes a note or a task in a single inbox note. `call Sam ~15m !low @fri` is read as a task (15 minutes, low priority, due Friday). The preview shows how it was understood and the exact line that will be saved.
 - **Tasks**: every `- [ ]` in the vault. Filter by status, due date, priority, tag, or any property of the note a task lives in. Group, search, tick off with Undo.
 - **Quick Log**: books, films, TV, music, restaurants/bars, food cooked, drinks made, and thoughts. Each saves a new note with `category: ["[[Books]]"]` etc. and shows the exact note before saving.
+- **Favorites**: flag any note as a favorite (`favorite: true`) and it appears on Home. Toggle from the note menu, the command palette, or the star in Logs.
 - **Logs**: browse everything you've logged. Filter by kind and time range, sort, search (including note text), and read excerpts without opening the notes.
 
 Rules it follows: it never edits existing notes in bulk, new notes are created only after you press Save, single changes have Undo, and everything has a hover explanation.

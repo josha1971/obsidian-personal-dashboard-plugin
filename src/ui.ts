@@ -1,6 +1,7 @@
 import { Notice, setIcon, setTooltip } from "obsidian";
 import type DashboardPlugin from "./main";
 import type { TaskItem } from "./store";
+import type { TFile } from "obsidian";
 import { friendlyDate, daysBetween, parseISODate } from "./dates";
 import { CaptureMode, describeCapture, formatCaptureLine, formatDuration, parseCapture } from "./parser";
 
@@ -139,4 +140,16 @@ export function renderCaptureBox(parent: HTMLElement, plugin: DashboardPlugin, o
   update();
   if (opts.autofocus) window.setTimeout(() => input.focus(), 30);
   return input;
+}
+
+/** A star that flags or unflags a note as a favorite. */
+export function starButton(parent: HTMLElement, file: TFile, on: boolean, plugin: DashboardPlugin): HTMLButtonElement {
+  const b = parent.createEl("button", { cls: `pd-star${on ? " is-on" : ""}` });
+  setIcon(b, "star");
+  setTooltip(b, on ? "Remove from favorites" : "Add to favorites. Sets a property on this note, with Undo", { delay: 300 });
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    void plugin.toggleFavorite(file);
+  });
+  return b;
 }

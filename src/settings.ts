@@ -12,6 +12,8 @@ export interface DashboardSettings {
   logsFolder: string;
   /** Frontmatter property that holds the category link, e.g. category: ["[[Books]]"]. */
   categoryProperty: string;
+  /** Checkbox-style property that marks a note as a favorite (favorite: true). */
+  favoriteProperty: string;
   /** Folders whose notes are ignored by Tasks and Logs. Comma separated. */
   excludeFolders: string;
   /** An inbox this big (or this old) becomes the "next best step". */
@@ -25,6 +27,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   capturePosition: "top",
   logsFolder: "",
   categoryProperty: "category",
+  favoriteProperty: "favorite",
   excludeFolders: "Templates, Bases, Attachments, Categories",
   inboxNudgeCount: 8,
   inboxNudgeDays: 7,
@@ -66,6 +69,10 @@ export class DashboardSettingTab extends PluginSettingTab {
       .setName("Category property")
       .setDesc("The property that links a note to its category note. Logs write it and the Logs page reads it.")
       .addText((t) => t.setValue(s.categoryProperty).onChange(async (v) => { s.categoryProperty = v.trim() || "category"; await save(); }));
+    new Setting(containerEl)
+      .setName("Favorite property")
+      .setDesc("A note with this property set to true appears under Favorites on Home. Toggle it from the note's menu or the command palette.")
+      .addText((t) => t.setValue(s.favoriteProperty).onChange(async (v) => { s.favoriteProperty = v.trim() || "favorite"; await save(); }));
     new Setting(containerEl)
       .setName("New log notes go in")
       .setDesc("A folder path. Leave empty to create them in the vault root.")

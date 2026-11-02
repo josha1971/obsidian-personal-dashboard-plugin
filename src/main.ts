@@ -5,17 +5,19 @@ import { HomeView } from "./views/homeView";
 import { TasksView } from "./views/tasksView";
 import { LogsView } from "./views/logsView";
 import { CaptureModal, LogModal } from "./modals";
-import { LogEntry, TaskItem, appendLine, collectLogs, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
+import { FavoriteItem, LogEntry, TaskItem, appendLine, collectFavorites, collectLogs, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
 import { CaptureMode, describeCapture, formatCaptureLine, parseCapture } from "./parser";
 import { toggleLine } from "./tasks";
 import { LogType } from "./logs";
 import { undoNotice } from "./ui";
+import { isFlagged } from "./favorites";
 
 export default class DashboardPlugin extends Plugin {
   settings!: DashboardSettings;
   private listeners = new Set<() => void>();
   private taskCache: TaskItem[] | null = null;
   private logCache: LogEntry[] | null = null;
+  private favCache: FavoriteItem[] | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -33,6 +35,16 @@ export default class DashboardPlugin extends Plugin {
     this.addCommand({ id: "quick-capture", name: "Quick capture", callback: () => this.openCaptureModal() });
     this.addCommand({ id: "log-something", name: "Log something", callback: () => this.openLogModal() });
     this.addCommand({ id: "log-thought", name: "Log a thought", callback: () => this.openLogModal("thought") });
+    this.addCommand({
+      id: "toggle-favorite",
+      name: "Toggle favorite for this note",
+      checkCallback: (checking) => {
+        const f = this.app.workspace.getActiveFile();
+        if (!f || f.extension !== "md") return false;
+        if (!checking) void this.toggleFavorite(f);
+        return true;
+      },
+    });
     this.addCommand({ id: "open-inbox", name: "Open inbox note", callback: () => void this.openInbox() });
     // One command per log type, so each can have its own hotkey.
     for (const t of this.settings.logTypes) {
@@ -40,6 +52,16 @@ export default class DashboardPlugin extends Plugin {
     }
 
     this.addSettingTab(new DashboardSettingTab(this.app, this));
+
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (!(file instanceof TFile) || file.extension !== "md") return;
+        const on = isFlagged(this.app.metadataCache.getFileCache(file)?.frontmatter?.[this.settings.favoriteProperty]);
+        menu.addItem((item) =>
+          item.setTitle(on ? "Remove from favorites" : "Add to favorites").setIcon("star").onClick(() => void this.toggleFavorite(file)),
+        );
+      }),
+    );
 
     const changed = debounce(() => this.invalidate(), 400, true);
     const onFile = (f: TAbstractFile) => { if (f instanceof TFile && f.extension === "md") changed(); };
@@ -76,11 +98,16 @@ export default class DashboardPlugin extends Plugin {
   invalidate(): void {
     this.taskCache = null;
     this.logCache = null;
+    this.favCache = null;
     for (const fn of this.listeners) fn();
   }
 
   getLogs(): LogEntry[] {
     return (this.logCache ??= collectLogs(this.app, this.settings));
+  }
+
+  getFavorites(): FavoriteItem[] {
+    return (this.favCache ??= collectFavorites(this.app, this.settings));
   }
 
   async getTasks(): Promise<TaskItem[]> {
@@ -183,6 +210,32 @@ export default class DashboardPlugin extends Plugin {
         return lines.join("\n");
       });
       if (!ok) throw new Error("the task has changed since");
+    });
+  }
+
+  /** Flags or unflags one note by changing only its favorite property. Undo restores it. */
+  async toggleFavorite(file: TFile): Promise<void> {
+    const prop = this.settings.favoriteProperty;
+    let nowOn = false;
+    try {
+      await this.app.fileManager.processFrontMatter(file, (fm) => {
+        if (isFlagged(fm[prop])) {
+          delete fm[prop];
+          nowOn = false;
+        } else {
+          fm[prop] = true;
+          nowOn = true;
+        }
+      });
+    } catch (e) {
+      new Notice(`Could not change favorite: ${(e as Error).message}`);
+      return;
+    }
+    undoNotice(nowOn ? `Added ${file.basename} to favorites.` : `Removed ${file.basename} from favorites.`, async () => {
+      await this.app.fileManager.processFrontMatter(file, (fm) => {
+        if (nowOn) delete fm[prop];
+        else fm[prop] = true;
+      });
     });
   }
 }
