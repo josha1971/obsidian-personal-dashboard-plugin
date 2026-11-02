@@ -32,6 +32,12 @@ export class OverviewView extends DashView {
     const file = this.app.vault.getAbstractFileByPath(this.path);
     const el = this.contentEl;
     if (!(file instanceof TFile)) { el.empty(); this.renderNav(el); el.createDiv({ cls: "pd-empty", text: "Choose a note in the Library to see it here." }); return; }
+    if (this.plugin.sealedPaths().has(file.path)) {
+      el.empty();
+      this.renderNav(el);
+      el.createDiv({ cls: "pd-empty", text: "This is a sealed letter to future you. It can't be opened from the dashboard until its delivery date." });
+      return;
+    }
     const text = await this.app.vault.cachedRead(file);
     if (!isCurrent()) return;
 

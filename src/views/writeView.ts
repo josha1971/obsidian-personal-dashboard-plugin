@@ -146,7 +146,8 @@ export class WriteView extends DashView {
   private async nextPrompt(): Promise<Prompt> {
     if (!this.pool) {
       this.pool = [];
-      const files = this.app.vault.getMarkdownFiles().filter((f) => !isExcluded(f, this.plugin.settings));
+      const sealed = this.plugin.sealedPaths();
+      const files = this.app.vault.getMarkdownFiles().filter((f) => !isExcluded(f, this.plugin.settings) && !sealed.has(f.path));
       for (let i = files.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [files[i], files[j]] = [files[j], files[i]]; }
       for (const f of files.slice(0, 80)) {
         const text = await this.app.vault.cachedRead(f);

@@ -29,6 +29,7 @@ A navigation bar on every page moves between them in the same tab. **Capture** a
 - Single changes (a tick, a favorite, a board move, a look-back) change one note and offer Undo.
 - Everything has a hover explanation.
 - No AI: anything the plugin decides is a rule.
+- Letters to future you stay out of the dashboard until they arrive: Search, Library, overviews, Garden, Write prompts and Favorites all skip them. (The note itself is still an ordinary file, so Obsidian can open it.)
 
 ## Install
 

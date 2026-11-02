@@ -24,8 +24,9 @@ export const NONE = "No value";
 export function libraryNotes(plugin: DashboardPlugin): LibNote[] {
   const app = plugin.app;
   const out: LibNote[] = [];
+  const sealed = plugin.sealedPaths();
   for (const file of app.vault.getMarkdownFiles()) {
-    if (isExcluded(file, plugin.settings) || file.path === plugin.settings.inboxPath) continue;
+    if (isExcluded(file, plugin.settings) || file.path === plugin.settings.inboxPath || sealed.has(file.path)) continue;
     const fm = (app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Fm;
     out.push({ file, fm, date: noteDate(fm, file) });
   }

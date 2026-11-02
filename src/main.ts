@@ -170,8 +170,9 @@ export default class DashboardPlugin extends Plugin {
   /** Notes marked status: draft (or draft: true), newest first. */
   getDrafts(): CatNote[] {
     const out: CatNote[] = [];
+    const sealed = this.sealedPaths();
     for (const file of this.app.vault.getMarkdownFiles()) {
-      if (isExcluded(file, this.settings)) continue;
+      if (isExcluded(file, this.settings) || sealed.has(file.path)) continue;
       const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined;
       if (!fm) continue;
       if (String(fm["status"] ?? "").toLowerCase() === "draft" || isFlagged(fm["draft"])) out.push({ file, fm, date: noteDate(fm, file) });
@@ -180,12 +181,20 @@ export default class DashboardPlugin extends Plugin {
   }
 
   getFavorites(): FavoriteItem[] {
-    return (this.favCache ??= collectFavorites(this.app, this.settings));
+    const sealed = this.sealedPaths();
+    return (this.favCache ??= collectFavorites(this.app, this.settings)).filter((f) => !sealed.has(f.file.path));
   }
 
   async getTasks(): Promise<TaskItem[]> {
     if (!this.taskCache) this.taskCache = await collectTasks(this.app, this.settings);
-    return this.taskCache;
+    const sealed = this.sealedPaths();
+    return sealed.size ? this.taskCache.filter((t) => !sealed.has(t.file.path)) : this.taskCache;
+  }
+
+  /** Letters to future you that have not arrived yet. The dashboard never shows their text. */
+  sealedPaths(): Set<string> {
+    const today = isoDate(new Date());
+    return new Set(this.getLetters().filter((l) => l.deliver > today).map((l) => l.file.path));
   }
 
   // ---- navigation --------------------------------------------------------
@@ -251,7 +260,8 @@ export default class DashboardPlugin extends Plugin {
 
   /** How many notes could be brought back, and which ones are shown today. */
   gardenToday(count: number, shuffle = 0): { picks: TFile[]; waiting: number } {
-    const files = this.app.vault.getMarkdownFiles().filter((f) => !this.gardenSkipped(f));
+    const sealed = this.sealedPaths();
+    const files = this.app.vault.getMarkdownFiles().filter((f) => !this.gardenSkipped(f) && !sealed.has(f.path));
     const byPath = new Map(files.map((f) => [f.path, f]));
     const cands: GardenCandidate[] = files.map((f) => ({ path: f.path, mtime: f.stat.mtime, size: f.stat.size }));
     const base = { nowMs: Date.now(), todayIso: isoDate(new Date()), days: this.settings.gardenDays, snoozed: this.settings.gardenSnoozed };

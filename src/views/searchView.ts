@@ -97,7 +97,8 @@ export class SearchView extends DashView {
       const list = c.body;
       let shown = 0;
       let found = 0;
-      const files = this.app.vault.getMarkdownFiles();
+      const sealed = this.plugin.sealedPaths();
+      const files = this.app.vault.getMarkdownFiles().filter((f) => !sealed.has(f.path));
       for (let i = 0; i < files.length && found < 100; i++) {
         if (id !== this.runId) return;
         const f = files[i];

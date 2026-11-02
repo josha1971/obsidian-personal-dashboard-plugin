@@ -134,6 +134,25 @@ describe("plugin smoke test", () => {
     expect(v.contentEl.textContent).toContain("Autumn market stall");
   });
 
+  it("never shows the text of a sealed letter", async () => {
+    expect(ctx.plugin.sealedPaths().has("Sealed letter.md")).toBe(true);
+    const search = await render(ctx.plugin, ctx.app, "personal-dashboard-search");
+    const input = search.contentEl.querySelector("input") as HTMLInputElement;
+    input.value = "secret";
+    input.dispatchEvent(new Event("input"));
+    await new Promise((r) => setTimeout(r, 600));
+    expect(search.contentEl.textContent).not.toContain("Sealed letter");
+    ctx.plugin.libraryState.layout = "list"; ctx.plugin.libraryState.category = ""; ctx.plugin.libraryState.search = "";
+    const lib = await render(ctx.plugin, ctx.app, "personal-dashboard-library");
+    expect(lib.contentEl.textContent).not.toContain("Sealed letter");
+    const ov = await render(ctx.plugin, ctx.app, "personal-dashboard-overview", { path: "Sealed letter.md" });
+    expect(ov.contentEl.textContent).toContain("sealed letter");
+    expect(ov.contentEl.textContent).not.toContain("secret");
+    expect(ctx.plugin.gardenToday(50).picks.map((f) => f.basename)).not.toContain("Sealed letter");
+    // The arrived letter is not sealed.
+    expect(ctx.plugin.sealedPaths().has("Letter to future me.md")).toBe(false);
+  });
+
   it("captures to the top of the inbox with Undo text", async () => {
     expect(await ctx.plugin.capture("call Sam ~15m !low @fri", "auto")).toBe(true);
     const inbox = ctx.files.get("Inbox.md")!.content;
