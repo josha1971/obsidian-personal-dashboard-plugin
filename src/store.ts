@@ -71,6 +71,34 @@ function frontmatterOf(app: App, file: TFile): Frontmatter | undefined {
   return app.metadataCache.getFileCache(file)?.frontmatter as Frontmatter | undefined;
 }
 
+export interface CatNote {
+  file: TFile;
+  fm: Frontmatter;
+  /** YYYY-MM-DD from the date property, else created, else the file's creation time. */
+  date: string;
+}
+
+export function noteDate(fm: Frontmatter | undefined, file: TFile): string {
+  for (const k of ["date", "created"]) {
+    const v = String(fm?.[k] ?? "");
+    if (parseISODate(v)) return v.slice(0, 10);
+  }
+  return isoDate(new Date(file.stat.ctime));
+}
+
+/** Notes whose category property links to the named category page. Not limited by ignored folders. */
+export function notesInCategory(app: App, settings: DashboardSettings, category: string): CatNote[] {
+  const want = category.toLowerCase();
+  const out: CatNote[] = [];
+  for (const file of app.vault.getMarkdownFiles()) {
+    const fm = frontmatterOf(app, file);
+    if (!fm) continue;
+    const cats = [...asList(fm[settings.categoryProperty]), ...asList(fm["categories"])].map((c) => linkTarget(c).toLowerCase());
+    if (cats.includes(want)) out.push({ file, fm, date: noteDate(fm, file) });
+  }
+  return out;
+}
+
 export function collectLogs(app: App, settings: DashboardSettings): LogEntry[] {
   const out: LogEntry[] = [];
   const types = settings.logTypes;

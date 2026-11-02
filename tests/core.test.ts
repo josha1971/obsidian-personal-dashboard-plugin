@@ -133,3 +133,122 @@ describe("favorites", () => {
     expect(isFlagged("no")).toBe(false);
   });
 });
+
+import { buildReviewNote, weekRange } from "../src/review";
+describe("review", () => {
+  it("finds the Monday to Sunday week", () => {
+    expect(weekRange(today)).toMatchObject({ start: "2026-11-02", end: "2026-11-08", key: "2026-W45" });
+    expect(weekRange(today, -1)).toMatchObject({ start: "2026-10-26", end: "2026-11-01", key: "2026-W44" });
+    expect(weekRange(new Date(2027, 0, 1)).key).toBe("2026-W53");
+  });
+  it("builds a review note", () => {
+    const r = weekRange(today, -1);
+    const n = buildReviewNote(
+      r,
+      { tasksDone: ["call Sam"], captured: 4, notesCreated: 6, words: 0, logged: [{ name: "Pine & Plum", type: "Restaurant / bar", rating: 9 }], decisions: [], letters: 0 },
+      { wentWell: "Shipped the stall sign.", didnt: "", focus: "Prices." },
+      { now: today, categoryProperty: "category", category: "Reviews" },
+    );
+    expect(n.filename).toBe("Weekly review 2026-W44.md");
+    expect(n.content).toContain('category:\n  - "[[Reviews]]"');
+    expect(n.content).toContain("week: 2026-W44");
+    expect(n.content).toContain("- [[Pine & Plum]] (Restaurant / bar, 9/10)");
+    expect(n.content).toContain("## What went well\n\nShipped the stall sign.");
+  });
+});
+
+import { addMonths } from "../src/dates";
+import { buildDecisionNote, buildLetterNote, lookBackSection, tallyOutcomes } from "../src/lookback";
+describe("look back", () => {
+  const opts = { now: today, categoryProperty: "category", category: "Letters" };
+  it("adds months safely", () => {
+    expect(addMonths(new Date(2026, 0, 31), 1)).toEqual(new Date(2026, 1, 28));
+    expect(addMonths(today, 6)).toEqual(new Date(2027, 4, 2));
+  });
+  it("builds a letter", () => {
+    const n = buildLetterNote("Dear future me.", "2027-05-02", opts);
+    expect(n.filename).toBe("Letter to future me 2026-11-02.md");
+    expect(n.content).toBe('---\ncreated: 2026-11-02T09:30:00\ncategory:\n  - "[[Letters]]"\ndeliver: 2027-05-02\n---\nDear future me.\n');
+    expect(buildLetterNote("x", "2027-05-02", opts, "Letter A").content).toContain('reply-to: "[[Letter A]]"');
+  });
+  it("builds a decision", () => {
+    const n = buildDecisionNote({ title: "Raise stall prices by 10%", decision: "Raise them.", why: "Costs went up.", expect: "", confidence: 7, lookback: "2026-12-02" }, { ...opts, category: "Decisions" });
+    expect(n.filename).toBe("Raise stall prices by 10%.md");
+    expect(n.content).toContain("status: open");
+    expect(n.content).toContain("lookback: 2026-12-02");
+    expect(n.content).toContain("confidence: 7");
+    expect(n.content).toContain("## The decision\n\nRaise them.");
+    expect(n.content).not.toContain("What I expect");
+  });
+  it("writes the look-back section and tallies", () => {
+    expect(lookBackSection("2026-12-02", "Right call", "Sales held.")).toBe("\n## Looking back (2026-12-02)\n\n**Right call.** Sales held.\n");
+    expect(tallyOutcomes(["Right call", "Right call", "Mixed"])).toEqual({ counts: { "Right call": 2, Mixed: 1 }, reviewed: 3, right: 2 });
+  });
+});
+
+import { pickGarden } from "../src/garden";
+import { choose } from "../src/choose";
+describe("garden", () => {
+  const cands = Array.from({ length: 20 }, (_, i) => ({ path: `n${i}.md`, mtime: Date.now() - (i < 10 ? 300 : 5) * 86400000, size: 500 }));
+  const base = { nowMs: Date.now(), todayIso: "2026-11-02", days: 120, count: 5, seed: "2026-11-02", snoozed: {} };
+  it("picks only old notes, the same ones all day", () => {
+    const a = pickGarden(cands, base);
+    expect(a).toHaveLength(5);
+    expect(a.every((c) => Number(c.path.slice(1, -3)) < 10)).toBe(true);
+    expect(pickGarden(cands, base).map((c) => c.path)).toEqual(a.map((c) => c.path));
+    expect(pickGarden(cands, { ...base, seed: "2026-11-02#1" }).map((c) => c.path)).not.toEqual(a.map((c) => c.path));
+  });
+  it("respects snoozes and tiny notes", () => {
+    const snoozed = { "n0.md": "never", "n1.md": "2026-12-01", "n2.md": "2026-10-01" };
+    const got = pickGarden([...cands, { path: "tiny.md", mtime: 0, size: 20 }], { ...base, count: 50, snoozed }).map((c) => c.path);
+    expect(got).not.toContain("n0.md");
+    expect(got).not.toContain("n1.md");
+    expect(got).toContain("n2.md");
+    expect(got).not.toContain("tiny.md");
+  });
+});
+describe("choose for me", () => {
+  const items = [
+    { name: "Pine & Plum", rating: 9, date: "2026-09-01", facets: { cuisine: ["Italian"] }, path: "a.md" },
+    { name: "Pine & Plum", rating: 9, date: "2026-10-01", facets: { cuisine: ["Italian"] }, path: "a2.md" },
+    { name: "Noodle Bar", rating: 6, date: "2026-08-01", facets: { cuisine: ["Chinese"] }, path: "b.md" },
+    { name: "Grill House", rating: 8, date: "2026-11-01", facets: { cuisine: ["Grill"] }, path: "c.md" },
+    { name: "Taco Place", rating: 8, date: "2026-06-01", facets: { cuisine: ["Mexican"] }, path: "d.md" },
+  ];
+  const o = { source: "favorites" as const, minRating: 8, avoidDays: 7, todayMs: new Date(2026, 10, 2).getTime(), rng: () => 0.1, count: 3 };
+  it("suggests well-rated places not visited lately, grouping repeats", () => {
+    const r = choose(items, o);
+    expect(r.map((x) => x.name).sort()).toEqual(["Pine & Plum", "Taco Place"]);
+    expect(r.find((x) => x.name === "Pine & Plum")!.reason).toContain("across 2 logs");
+  });
+  it("filters by a facet", () => {
+    expect(choose(items, { ...o, filterKey: "cuisine", filterValue: "mexican" }).map((x) => x.name)).toEqual(["Taco Place"]);
+  });
+  it("finds unrated things", () => {
+    const r = choose([{ name: "Dune", date: "2026-05-01", status: "Want to read", facets: {}, path: "x.md" }, { name: "Emma", rating: 7, date: "2026-01-01", facets: {}, path: "y.md" }, { name: "Ulysses", date: "2026-01-01", status: "Dropped", facets: {}, path: "z.md" }], { ...o, source: "unrated" });
+    expect(r.map((x) => x.name)).toEqual(["Dune"]);
+  });
+});
+
+import { explore, monthKeys } from "../src/explore";
+describe("explore", () => {
+  const es = [
+    { date: "2026-10-03", rating: 9, cost: 40, split: ["Old Town"] },
+    { date: "2026-10-20", rating: 7, cost: 20, split: ["Old Town"] },
+    { date: "2026-09-05", rating: 6, cost: 30, split: ["Market Street"] },
+    { date: "2025-01-05", rating: 1, split: ["Ancient"] },
+  ];
+  const months = monthKeys(new Date(2026, 10, 2), 3);
+  it("builds month keys", () => expect(months).toEqual(["2026-09", "2026-10", "2026-11"]));
+  it("aggregates by split and month, ignoring entries outside the months", () => {
+    const r = explore(es, months, "rating");
+    expect(r.cells["Old Town"]["2026-10"]).toBe(8);
+    expect(r.cells["Old Town"]["2026-09"]).toBeNull();
+    expect(r.series).not.toContain("Ancient");
+    expect(explore(es, months, "spend").cells["Market Street"]["2026-09"]).toBe(30);
+    expect(explore(es, months, "count").overall).toBe(3);
+  });
+  it("ranks by average rating", () => {
+    expect(explore(es, months, "count").ranking.map((x) => x.name)).toEqual(["Old Town", "Market Street"]);
+  });
+});

@@ -79,3 +79,22 @@ export function isoWeek(d: Date): number {
   const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
   return Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
+
+/** The ISO week-based year (differs from the calendar year around New Year). */
+export function isoWeekYear(d: Date): number {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return t.getUTCFullYear();
+}
+
+export function formatShort(iso: string): string {
+  const d = parseISODate(iso);
+  return d ? `${d.getDate()} ${MONTHS[d.getMonth()]}` : iso;
+}
+
+/** Adds calendar months, clamping to the end of a shorter month (31 Jan + 1 month = 28 Feb). */
+export function addMonths(d: Date, n: number): Date {
+  const target = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  return new Date(target.getFullYear(), target.getMonth(), Math.min(d.getDate(), last));
+}

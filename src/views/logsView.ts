@@ -4,7 +4,9 @@ import { DashView } from "./base";
 import { VIEW_LOGS } from "../constants";
 import { addDays, friendlyDate, isoDate, startOfDay } from "../dates";
 import { LogEntry } from "../store";
-import { chip, iconButton, starButton } from "../ui";
+import { chip, iconButton, sectionCard, starButton } from "../ui";
+import { ExploreEntry, Metric, explore, monthKeys } from "../explore";
+import { asList, linkTarget } from "../store";
 import { isFlagged } from "../favorites";
 
 type Range = "30" | "90" | "180" | "365" | "all";
@@ -16,6 +18,9 @@ export class LogsView extends DashView {
   private range: Range = "365";
   private sort: Sort = "newest";
   private search = "";
+  private metric: Metric = "count";
+  private splitKey = "";
+  private exploreEl?: HTMLElement;
   private listEl?: HTMLElement;
   private summaryEl?: HTMLElement;
   private excerpts = new Map<string, { mtime: number; text: string }>();
@@ -38,6 +43,7 @@ export class LogsView extends DashView {
     const el = this.contentEl;
     el.empty();
 
+    this.renderNav(el);
     const head = el.createDiv({ cls: "pd-page-head" });
     const t = head.createDiv();
     t.createDiv({ cls: "pd-kicker", text: "Everything you've logged, in one place" });
@@ -87,6 +93,7 @@ export class LogsView extends DashView {
     search.value = this.search;
     search.addEventListener("input", () => { this.search = search.value; this.renderList(); });
 
+    this.exploreEl = el.createDiv({ cls: "pd-explore" });
     this.summaryEl = el.createDiv({ cls: "pd-muted pd-summary" });
     this.listEl = el.createDiv({ cls: "pd-loglist" });
     this.renderList();
@@ -121,9 +128,103 @@ export class LogsView extends DashView {
     });
   }
 
+  private splitOptions(): [string, string][] {
+    const opts: [string, string][] = [["", "Nothing"]];
+    if (this.typeId === "all") opts.push(["__type", "Kind of log"]);
+    else {
+      const t = this.plugin.settings.logTypes.find((x) => x.id === this.typeId);
+      for (const f of t?.fields ?? []) if (["choice", "text", "multi"].includes(f.kind) && f.key !== "why") opts.push([f.key, f.label]);
+    }
+    return opts;
+  }
+
+  private renderExplore(items: LogEntry[]): void {
+    const box = this.exploreEl;
+    if (!box) return;
+    box.empty();
+    const opts = this.splitOptions();
+    if (!opts.some(([k]) => k === this.splitKey)) this.splitKey = "";
+    const { body } = sectionCard(box, "Explore your logs", "filter, split, compare", "pd-tone-green");
+
+    const bar = body.createDiv({ cls: "pd-controls" });
+    const m = bar.createDiv({ cls: "pd-control" });
+    m.createSpan({ text: "Show", cls: "pd-control-label" });
+    const seg = m.createDiv({ cls: "pd-seg" });
+    const metrics: [Metric, string, string][] = [["count", "Count", "How many logs"], ["rating", "Rating", "Average rating"], ["spend", "Spend", "Total of the cost field"]];
+    for (const [v, label, tip] of metrics) {
+      const b = seg.createEl("button", { text: label, cls: "pd-seg-btn" });
+      b.toggleClass("is-active", this.metric === v);
+      setTooltip(b, tip, { delay: 300 });
+      b.addEventListener("click", () => { this.metric = v; this.renderExplore(items); });
+    }
+    const sp = bar.createDiv({ cls: "pd-control" });
+    sp.createSpan({ text: "Split by", cls: "pd-control-label" });
+    const sel = sp.createEl("select", { cls: "dropdown" });
+    for (const [v, label] of opts) sel.createEl("option", { value: v, text: label });
+    sel.value = this.splitKey;
+    sel.addEventListener("change", () => { this.splitKey = sel.value; this.renderExplore(items); });
+
+    const entries: ExploreEntry[] = items.map((e) => ({
+      date: e.date,
+      rating: e.rating,
+      cost: typeof e.fm["cost"] === "number" ? (e.fm["cost"] as number) : undefined,
+      split: this.splitKey === "__type" ? [e.type.label] : this.splitKey ? asList(e.fm[this.splitKey]).map(linkTarget).filter(Boolean) : [],
+    }));
+    const now = new Date();
+    let n = ({ "30": 2, "90": 3, "180": 6, "365": 12 } as Record<string, number>)[this.range] ?? 12;
+    if (this.range === "all") {
+      const first = entries.reduce((a, e) => (e.date < a ? e.date : a), isoDate(now));
+      n = Math.min(24, Math.max(3, (now.getFullYear() - Number(first.slice(0, 4))) * 12 + now.getMonth() - (Number(first.slice(5, 7)) - 1) + 1));
+    }
+    const months = monthKeys(now, n);
+    const res = explore(this.splitKey ? entries : entries.map((e) => ({ ...e, split: ["All"] })), months, this.metric);
+
+    const fmt = (v: number | null) => (v === null ? "-" : this.metric === "rating" ? v.toFixed(1) : String(Math.round(v * 100) / 100));
+    const tiles = body.createDiv({ cls: "pd-stats pd-stats-wide" });
+    const tile = (label: string, v: string) => { const t = tiles.createDiv({ cls: "pd-stat is-static" }); t.createDiv({ cls: "pd-stat-value", text: v }); t.createDiv({ cls: "pd-stat-label", text: label }); };
+    tile(this.metric === "count" ? "logs in this period" : this.metric === "rating" ? "average rating" : "total spend", fmt(res.overall));
+
+    const max = Math.max(0, ...res.series.flatMap((s) => months.map((mo) => res.cells[s][mo] ?? 0)));
+    if (!max) { body.createDiv({ cls: "pd-empty", text: this.metric === "count" ? "Nothing in this period." : `Nothing to show. ${this.metric === "spend" ? "Add a cost to your logs" : "Add ratings to your logs"} and it will appear here.` }); return; }
+    const colors = ["--color-blue", "--color-green", "--color-orange", "--color-red", "--color-purple", "--color-cyan", "--text-faint"];
+    const chart = body.createDiv({ cls: "pd-chart" });
+    for (const mo of months) {
+      const col = chart.createDiv({ cls: "pd-chart-col" });
+      const bars = col.createDiv({ cls: "pd-chart-bars" });
+      res.series.forEach((sname, i) => {
+        const v = res.cells[sname][mo];
+        const b = bars.createDiv({ cls: "pd-chart-bar" });
+        b.style.height = v ? `${Math.max(3, (v / max) * 100)}%` : "0";
+        b.style.background = `var(${colors[i % colors.length]})`;
+        if (v) setTooltip(b, `${sname} · ${mo}: ${fmt(v)}`, { delay: 100 });
+      });
+      col.createDiv({ cls: "pd-chart-label", text: new Date(Number(mo.slice(0, 4)), Number(mo.slice(5)) - 1, 1).toLocaleDateString(undefined, { month: "short" }) });
+    }
+    if (this.splitKey) {
+      const legend = body.createDiv({ cls: "pd-legend" });
+      res.series.forEach((sname, i) => {
+        const l = legend.createSpan({ cls: "pd-legend-item" });
+        l.createSpan({ cls: "pd-legend-dot" }).style.background = `var(${colors[i % colors.length]})`;
+        l.createSpan({ text: sname });
+      });
+      const rank = body.createEl("table", { cls: "pd-table pd-rank" });
+      const hr = rank.createEl("thead").createEl("tr");
+      for (const h of [opts.find(([k]) => k === this.splitKey)?.[1] ?? "", "Count", "Avg rating", "Spend"]) hr.createEl("th", { text: h });
+      const tb = rank.createEl("tbody");
+      for (const r of res.ranking.slice(0, 12)) {
+        const tr = tb.createEl("tr");
+        tr.createEl("td", { text: r.name, cls: "pd-logname-title" });
+        tr.createEl("td", { text: String(r.count) });
+        tr.createEl("td", { text: r.avgRating === null ? "-" : r.avgRating.toFixed(1) });
+        tr.createEl("td", { text: r.spend ? String(Math.round(r.spend)) : "-" });
+      }
+    }
+  }
+
   private renderList(): void {
     if (!this.listEl || !this.summaryEl) return;
     const items = this.filtered();
+    this.renderExplore(items);
     const rated = items.filter((e) => e.rating !== undefined);
     const avg = rated.length ? (rated.reduce((s, e) => s + (e.rating ?? 0), 0) / rated.length).toFixed(1) : null;
     this.summaryEl.setText(`${items.length} ${items.length === 1 ? "log" : "logs"}${avg ? ` · average rating ${avg}` : ""}`);

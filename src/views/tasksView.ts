@@ -45,6 +45,7 @@ export class TasksView extends DashView {
     const el = this.contentEl;
     el.empty();
 
+    this.renderNav(el);
     const head = el.createDiv({ cls: "pd-page-head" });
     const t = head.createDiv();
     t.createDiv({ cls: "pd-kicker", text: "Every checkbox in your vault" });
