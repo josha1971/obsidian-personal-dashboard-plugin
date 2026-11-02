@@ -148,10 +148,10 @@ describe("plugin smoke test", () => {
   });
 
   it("favorites toggle for notes and canvases", async () => {
-    const note = ctx.files.get("Pine & Plum.md")!.file;
+    const note = ctx.files.get("Pine & Plum.md")!.file as any;
     await ctx.plugin.toggleFavorite(note);
     expect(ctx.files.get("Pine & Plum.md")!.fm!.favorite).toBe(true);
-    const canvas = ctx.files.get("Whiteboard.canvas")!.file;
+    const canvas = ctx.files.get("Whiteboard.canvas")!.file as any;
     await ctx.plugin.toggleFavorite(canvas);
     expect(ctx.plugin.settings.favoriteFiles).toContain("Whiteboard.canvas");
     ctx.plugin.invalidate();
@@ -202,13 +202,13 @@ describe("plugin smoke test", () => {
   });
 
   it("looks back on a decision, keeps a letter, and snoozes a garden note", async () => {
-    const dec = ctx.files.get("Raise prices.md")!.file;
+    const dec = ctx.files.get("Raise prices.md")!.file as any;
     await ctx.plugin.applyLookBack(dec, "Right call", "Sales held.");
     expect(ctx.files.get("Raise prices.md")!.fm).toMatchObject({ status: "reviewed", outcome: "Right call" });
     expect(ctx.files.get("Raise prices.md")!.content).toContain("**Right call.** Sales held.");
-    await ctx.plugin.keepLetter(ctx.files.get("Letter to future me.md")!.file);
+    await ctx.plugin.keepLetter(ctx.files.get("Letter to future me.md")!.file as any);
     expect(ctx.files.get("Letter to future me.md")!.fm!.kept).toBe(true);
-    const old = ctx.files.get("Old idea.md")!.file;
+    const old = ctx.files.get("Old idea.md")!.file as any;
     await ctx.plugin.snoozeGarden(old, "never");
     expect(ctx.plugin.gardenToday(10).picks.map((f) => f.basename)).not.toContain("Old idea");
   });
