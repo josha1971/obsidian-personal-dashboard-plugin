@@ -1,0 +1,9 @@
+{
+  "id": "personal-dashboard",
+  "name": "Personal Dashboard",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Home dashboard with quick capture, vault-wide tasks and structured quick logs (books, films, places, drinks, thoughts...).",
+  "author": "Joshua Anderson",
+  "isDesktopOnly": false
+}

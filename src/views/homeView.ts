@@ -1,0 +1,166 @@
+import { WorkspaceLeaf, setTooltip } from "obsidian";
+import type DashboardPlugin from "../main";
+import { DashView } from "./base";
+import { VIEW_HOME } from "../constants";
+import { daysBetween, friendlyDate, isoDate, isoWeek, parseISODate, startOfDay } from "../dates";
+import { InboxItem, LogEntry, TaskItem, readInbox } from "../store";
+import { chip, iconButton, renderCaptureBox, renderTaskRow, sectionCard } from "../ui";
+
+interface NextStep {
+  title: string;
+  detail: string;
+  action: string;
+  run: () => void;
+  icon: string;
+}
+
+function taskScore(t: TaskItem, today: Date): number {
+  if (t.info.state !== "open") return -1;
+  const due = t.info.due ? daysBetween(today, parseISODate(t.info.due) ?? today) : undefined;
+  let score = 0;
+  if (due !== undefined) {
+    if (due < 0) score = 100 + Math.min(-due, 30);
+    else if (due === 0) score = 90;
+    else if (due <= 3) score = 60 - due;
+    else score = 20;
+  }
+  if (t.info.priority === "high") score += 30;
+  else if (t.info.priority === "medium") score += 10;
+  return score;
+}
+
+export class HomeView extends DashView {
+  private skipped = 0;
+
+  constructor(leaf: WorkspaceLeaf, plugin: DashboardPlugin) {
+    super(leaf, plugin);
+  }
+  getViewType() { return VIEW_HOME; }
+  getDisplayText() { return "Home"; }
+  getIcon() { return "layout-dashboard"; }
+
+  protected async render(isCurrent: () => boolean): Promise<void> {
+    const [tasks, inbox] = await Promise.all([this.plugin.getTasks(), readInbox(this.app, this.plugin.settings)]);
+    if (!isCurrent()) return;
+    const logs = this.plugin.getLogs();
+    const today = startOfDay(new Date());
+    const el = this.contentEl;
+    el.empty();
+
+    // Header
+    const head = el.createDiv({ cls: "pd-home-head" });
+    const titles = head.createDiv();
+    titles.createDiv({ cls: "pd-kicker", text: `Week ${isoWeek(today)} · ${inbox.length} ${inbox.length === 1 ? "thing" : "things"} in the inbox` });
+    titles.createEl("h1", { cls: "pd-title", text: new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }) });
+    const capture = head.createDiv({ cls: "pd-home-capture" });
+    renderCaptureBox(capture, this.plugin);
+
+    // Shortcuts
+    const bar = el.createDiv({ cls: "pd-actions" });
+    iconButton(bar, "plus", "Log something", () => this.plugin.openLogModal());
+    iconButton(bar, "check-square", "Tasks", () => void this.plugin.activateView("tasks"));
+    iconButton(bar, "library", "Logs", () => void this.plugin.activateView("logs"));
+    iconButton(bar, "inbox", "Open inbox", () => void this.plugin.openInbox());
+
+    const open = tasks.filter((t) => t.info.state === "open");
+    const overdue = open.filter((t) => t.info.due && daysBetween(today, parseISODate(t.info.due) ?? today) < 0);
+    const dueToday = open.filter((t) => t.info.due === isoDate(today));
+    const weekAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+    const loggedThisWeek = logs.filter((l) => (parseISODate(l.date) ?? 0) >= weekAgo);
+
+    // Top row: next best step + the week at a glance
+    const top = el.createDiv({ cls: "pd-toprow" });
+    this.renderNextStep(top, this.nextSteps(open, overdue, dueToday, inbox, loggedThisWeek, today));
+    const stats = sectionCard(top, "At a glance", "", "pd-stats-card").body;
+    const grid = stats.createDiv({ cls: "pd-stats" });
+    this.stat(grid, String(open.length), "open tasks", () => void this.plugin.activateView("tasks"), "Every unchecked box in your vault");
+    this.stat(grid, String(overdue.length), "overdue", () => void this.plugin.activateView("tasks"), "Open tasks with a due date in the past", overdue.length > 0 ? "is-warn" : "");
+    this.stat(grid, String(inbox.length), "in the inbox", () => void this.plugin.openInbox(), "Lines waiting in your inbox note");
+    this.stat(grid, String(loggedThisWeek.length), "logged this week", () => void this.plugin.activateView("logs"), "Log notes from the last 7 days");
+
+    // Next steps
+    const ranked = open.map((t) => ({ t, s: taskScore(t, today) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 6);
+    const steps = sectionCard(el, "Next steps", ranked.length ? `${ranked.length} things, most useful first` : "", "pd-tone-red");
+    if (!ranked.length) {
+      steps.body.createDiv({ cls: "pd-empty", text: open.length ? "Nothing is due or marked important. Open Tasks to pick something." : "No open tasks. Capture one above." });
+    } else {
+      for (const { t } of ranked) renderTaskRow(steps.body, t, this.plugin, today);
+    }
+
+    // Recent logs
+    const recent = [...logs].sort((a, b) => b.date.localeCompare(a.date) || b.file.stat.ctime - a.file.stat.ctime).slice(0, 6);
+    const rl = sectionCard(el, "Recent logs", recent.length ? "latest first" : "", "pd-tone-green");
+    if (!recent.length) {
+      rl.body.createDiv({ cls: "pd-empty", text: "Nothing logged yet. Use Log something to add a book, film, meal, drink or thought." });
+    } else {
+      for (const l of recent) this.renderLogRow(rl.body, l, today);
+    }
+  }
+
+  private stat(parent: HTMLElement, value: string, label: string, onClick: () => void, tip: string, cls = ""): void {
+    const b = parent.createEl("button", { cls: `pd-stat ${cls}`.trim() });
+    b.createDiv({ cls: "pd-stat-value", text: value });
+    b.createDiv({ cls: "pd-stat-label", text: label });
+    setTooltip(b, tip, { delay: 300 });
+    b.addEventListener("click", onClick);
+  }
+
+  private renderLogRow(parent: HTMLElement, l: LogEntry, today: Date): void {
+    const row = parent.createDiv({ cls: "pd-logrow" });
+    chip(row, l.type.label, "is-type");
+    const name = row.createSpan({ text: l.file.basename, cls: "pd-logrow-name" });
+    name.addEventListener("click", () => void this.plugin.openFile(l.file));
+    setTooltip(name, "Open this note", { delay: 400 });
+    if (l.detail) row.createSpan({ text: l.detail, cls: "pd-muted pd-logrow-detail" });
+    if (l.rating !== undefined) chip(row, `${l.rating}/10`, "is-rating");
+    row.createSpan({ text: friendlyDate(l.date, today), cls: "pd-muted pd-logrow-date" });
+  }
+
+  private nextSteps(open: TaskItem[], overdue: TaskItem[], dueToday: TaskItem[], inbox: InboxItem[], loggedThisWeek: LogEntry[], today: Date): NextStep[] {
+    const s = this.plugin.settings;
+    const out: NextStep[] = [];
+    const goTasks = () => void this.plugin.activateView("tasks");
+    if (overdue.length) {
+      out.push({ icon: "alarm-clock", title: `${overdue.length} ${overdue.length === 1 ? "task is" : "tasks are"} overdue`, detail: "Finish, reschedule or drop them. It takes a couple of minutes.", action: "Open tasks", run: goTasks });
+    }
+    const dated = inbox.filter((i) => i.added).map((i) => daysBetween(parseISODate(i.added!) ?? today, today));
+    const oldest = dated.length ? Math.max(...dated) : 0;
+    if (inbox.length >= s.inboxNudgeCount || (inbox.length > 0 && oldest >= s.inboxNudgeDays)) {
+      const age = oldest >= s.inboxNudgeDays ? `, the oldest is ${oldest} days old` : "";
+      out.push({ icon: "inbox", title: `${inbox.length} things are waiting in the inbox${age}`, detail: "Sort a few now: turn them into notes, tasks, or delete them.", action: "Sort them", run: () => void this.plugin.openInbox() });
+    }
+    if (dueToday.length) {
+      out.push({ icon: "calendar-check", title: `${dueToday.length} ${dueToday.length === 1 ? "task is" : "tasks are"} due today`, detail: dueToday[0].info.text, action: "Open tasks", run: goTasks });
+    }
+    if (loggedThisWeek.length === 0) {
+      out.push({ icon: "plus", title: "Nothing logged this week", detail: "A film, a meal, a coffee, a thought. A line is enough.", action: "Log something", run: () => this.plugin.openLogModal() });
+    }
+    if (!out.length) {
+      out.push({
+        icon: "sparkles",
+        title: open.length ? "You're on top of things" : "Everything is clear",
+        detail: open.length ? `${open.length} open tasks, none overdue or due today.` : "No open tasks and an empty inbox.",
+        action: "Capture a thought",
+        run: () => this.plugin.openCaptureModal(),
+      });
+    }
+    return out;
+  }
+
+  private renderNextStep(parent: HTMLElement, steps: NextStep[]): void {
+    const step = steps[this.skipped % steps.length];
+    const card = parent.createDiv({ cls: "pd-card pd-next" });
+    card.createDiv({ cls: "pd-kicker", text: "Next best step" });
+    card.createEl("h3", { cls: "pd-next-title", text: step.title });
+    card.createDiv({ cls: "pd-muted", text: step.detail });
+    const row = card.createDiv({ cls: "pd-next-actions" });
+    const go = row.createEl("button", { text: step.action, cls: "pd-btn mod-cta" });
+    setTooltip(go, "Chosen by simple rules: overdue, inbox size, due today, then logging", { delay: 300 });
+    go.addEventListener("click", step.run);
+    if (steps.length > 1) {
+      const other = row.createEl("button", { text: "Something else", cls: "pd-link" });
+      other.addEventListener("click", () => { this.skipped++; void this.refresh(); });
+    }
+  }
+}
+
