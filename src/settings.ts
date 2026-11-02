@@ -14,6 +14,8 @@ export interface DashboardSettings {
   categoryProperty: string;
   /** Checkbox-style property that marks a note as a favorite (favorite: true). */
   favoriteProperty: string;
+  /** Favorites that are not markdown notes (canvases, bases, PDFs...). They have no properties, so they are remembered here. */
+  favoriteFiles: string[];
   /** Folders whose notes are ignored by Tasks and Logs. Comma separated. */
   excludeFolders: string;
   /** An inbox this big (or this old) becomes the "next best step". */
@@ -28,6 +30,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   logsFolder: "",
   categoryProperty: "category",
   favoriteProperty: "favorite",
+  favoriteFiles: [],
   excludeFolders: "Templates, Bases, Attachments, Categories",
   inboxNudgeCount: 8,
   inboxNudgeDays: 7,

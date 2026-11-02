@@ -106,6 +106,10 @@ export function collectFavorites(app: App, settings: DashboardSettings): Favorit
     const cat = [...asList(fm[settings.categoryProperty]), ...asList(fm["categories"])].map(linkTarget).find(Boolean);
     out.push({ file, category: cat });
   }
+  for (const path of settings.favoriteFiles) {
+    const f = app.vault.getAbstractFileByPath(path);
+    if (f instanceof TFile) out.push({ file: f, category: f.extension === "canvas" ? "Canvas" : f.extension.toUpperCase() });
+  }
   return out.sort((a, b) => a.file.basename.localeCompare(b.file.basename));
 }
 

@@ -37,10 +37,10 @@ export default class DashboardPlugin extends Plugin {
     this.addCommand({ id: "log-thought", name: "Log a thought", callback: () => this.openLogModal("thought") });
     this.addCommand({
       id: "toggle-favorite",
-      name: "Toggle favorite for this note",
+      name: "Toggle favorite for this note or canvas",
       checkCallback: (checking) => {
         const f = this.app.workspace.getActiveFile();
-        if (!f || f.extension !== "md") return false;
+        if (!f) return false;
         if (!checking) void this.toggleFavorite(f);
         return true;
       },
@@ -55,11 +55,30 @@ export default class DashboardPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (!(file instanceof TFile) || file.extension !== "md") return;
-        const on = isFlagged(this.app.metadataCache.getFileCache(file)?.frontmatter?.[this.settings.favoriteProperty]);
+        if (!(file instanceof TFile)) return;
+        const on = this.isFavorite(file);
         menu.addItem((item) =>
           item.setTitle(on ? "Remove from favorites" : "Add to favorites").setIcon("star").onClick(() => void this.toggleFavorite(file)),
         );
+      }),
+    );
+
+    // Keep non-note favorites (canvases etc.) pointing at the right file.
+    this.registerEvent(
+      this.app.vault.on("rename", (f, oldPath) => {
+        const i = this.settings.favoriteFiles.indexOf(oldPath);
+        if (i >= 0) {
+          this.settings.favoriteFiles[i] = f.path;
+          void this.saveSettings();
+        }
+      }),
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", (f) => {
+        if (this.settings.favoriteFiles.includes(f.path)) {
+          this.settings.favoriteFiles = this.settings.favoriteFiles.filter((p) => p !== f.path);
+          void this.saveSettings();
+        }
       }),
     );
 
@@ -213,8 +232,26 @@ export default class DashboardPlugin extends Plugin {
     });
   }
 
+  isFavorite(file: TFile): boolean {
+    if (file.extension !== "md") return this.settings.favoriteFiles.includes(file.path);
+    return isFlagged(this.app.metadataCache.getFileCache(file)?.frontmatter?.[this.settings.favoriteProperty]);
+  }
+
+  /** Canvases and other non-note files have no properties, so their favorites are remembered in the plugin's settings. */
+  private async toggleFavoriteFile(file: TFile): Promise<void> {
+    const had = this.settings.favoriteFiles.includes(file.path);
+    const set = async (on: boolean) => {
+      const rest = this.settings.favoriteFiles.filter((p) => p !== file.path);
+      this.settings.favoriteFiles = on ? [...rest, file.path] : rest;
+      await this.saveSettings();
+    };
+    await set(!had);
+    undoNotice(had ? `Removed ${file.basename} from favorites.` : `Added ${file.basename} to favorites.`, () => set(had));
+  }
+
   /** Flags or unflags one note by changing only its favorite property. Undo restores it. */
   async toggleFavorite(file: TFile): Promise<void> {
+    if (file.extension !== "md") return this.toggleFavoriteFile(file);
     const prop = this.settings.favoriteProperty;
     let nowOn = false;
     try {
