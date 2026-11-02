@@ -25,7 +25,7 @@ export interface LogType {
   /** Name of the category note this log belongs to, e.g. "Books" saves category: [[Books]]. */
   category: string;
   nameLabel: string;
-  /** "timestamp" titles the note "Thought 2026-11-02 1432" instead of asking for a name. */
+  /** "timestamp" adds the date and time after the title you type ("Idea 2026-11-02 1432"). The title is optional. */
   titleMode?: "name" | "timestamp";
   titlePrefix?: string;
   tags?: string[];
@@ -160,11 +160,12 @@ function scalar(field: LogField, v: string | number): string {
 }
 
 export function titleFor(type: LogType, name: string, now: Date): string {
-  if (type.titleMode === "timestamp" || !name.trim()) {
-    const prefix = type.titlePrefix ?? type.label;
-    return `${prefix} ${isoDate(now)} ${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const base = safeFileName(name);
+  if (type.titleMode === "timestamp") {
+    // Whatever you type, with the date and time added: "Pour-over ratio 2026-11-02 1432".
+    return `${base || type.titlePrefix || type.label} ${isoDate(now)} ${pad(now.getHours())}${pad(now.getMinutes())}`;
   }
-  return safeFileName(name) || `${type.label} ${isoDate(now)}`;
+  return base || `${type.label} ${isoDate(now)}`;
 }
 
 /**

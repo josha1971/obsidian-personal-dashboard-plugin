@@ -87,6 +87,10 @@ describe("log notes", () => {
     const thought = DEFAULT_LOG_TYPES.find((t) => t.id === "thought")!;
     expect(buildLogNote(thought, "", {}, "idea", { now: today, categoryProperty: "category" }).filename).toBe("Thought 2026-11-02 0930.md");
   });
+  it("adds the date after a typed thought title", () => {
+    const thought = DEFAULT_LOG_TYPES.find((t) => t.id === "thought")!;
+    expect(buildLogNote(thought, "Pour-over ratio", {}, "idea", { now: today, categoryProperty: "category" }).filename).toBe("Pour-over ratio 2026-11-02 0930.md");
+  });
   it("sanitises names and quotes risky yaml", () => {
     expect(buildLogNote(place, "A/B: C?", {}, "", { now: today, categoryProperty: "category" }).filename).toBe("A B C.md");
     expect(yamlString("2026")).toBe('"2026"');

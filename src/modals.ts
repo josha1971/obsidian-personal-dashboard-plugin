@@ -109,8 +109,8 @@ export class LogModal extends Modal {
     this.showIfEls = [];
     const f = this.formEl;
 
-    if (t.titleMode !== "timestamp") {
-      const wrap = this.fieldWrap(f, t.nameLabel);
+    {
+      const wrap = this.fieldWrap(f, t.nameLabel, t.titleMode === "timestamp" ? "optional, the date is added for you" : "");
       const input = wrap.createEl("input", { type: "text", cls: "pd-input" });
       input.value = this.name;
       input.addEventListener("input", () => { this.name = input.value; this.updatePreview(); });
@@ -125,7 +125,6 @@ export class LogModal extends Modal {
       ta.rows = t.bodyRequired ? 6 : 4;
       ta.value = this.body;
       ta.addEventListener("input", () => { this.body = ta.value; this.updatePreview(); });
-      if (t.titleMode === "timestamp") window.setTimeout(() => ta.focus(), 30);
     }
     this.syncShowIf();
   }
