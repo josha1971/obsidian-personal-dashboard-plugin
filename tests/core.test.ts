@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCapture, formatCaptureLine, parseDuration, formatDuration } from "../src/parser";
+import { insertCaptureLine, parseCapture, formatCaptureLine, parseDuration, formatDuration } from "../src/parser";
 import { parseTaskLine, toggleLine } from "../src/tasks";
 import { parseDateToken, isoWeek, friendlyDate } from "../src/dates";
 import { DEFAULT_LOG_TYPES, buildLogNote, parseLogTypes, yamlString } from "../src/logs";
@@ -96,5 +96,24 @@ describe("log notes", () => {
     expect(parseLogTypes(JSON.stringify(DEFAULT_LOG_TYPES)).types).toHaveLength(DEFAULT_LOG_TYPES.length);
     expect(parseLogTypes("[]").error).toBeTruthy();
     expect(parseLogTypes("nope").error).toMatch(/JSON/);
+  });
+});
+
+describe("insertCaptureLine", () => {
+  it("adds to the bottom", () => {
+    expect(insertCaptureLine("- a\n", "- new", "bottom")).toBe("- a\n- new\n");
+    expect(insertCaptureLine("", "- new", "bottom")).toBe("- new\n");
+  });
+  it("adds to the top of a plain note", () => {
+    expect(insertCaptureLine("- a\n- b\n", "- new", "top")).toBe("- new\n- a\n- b\n");
+    expect(insertCaptureLine("", "- new", "top")).toBe("- new\n");
+  });
+  it("goes below frontmatter and a leading title", () => {
+    const data = "---\ntags: x\n---\n# Random notes\n\n- a\n";
+    expect(insertCaptureLine(data, "- new", "top")).toBe("---\ntags: x\n---\n# Random notes\n\n- new\n- a\n");
+    expect(insertCaptureLine("---\ntags: x\n---\n- a\n", "- new", "top")).toBe("---\ntags: x\n---\n- new\n- a\n");
+  });
+  it("does not treat a lower heading as the title", () => {
+    expect(insertCaptureLine("## Today\n- a\n", "- new", "top")).toBe("- new\n## Today\n- a\n");
   });
 });

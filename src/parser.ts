@@ -116,3 +116,25 @@ export function describeCapture(p: ParsedCapture, today: Date): string[] {
   for (const t of p.tags) out.push(`#${t}`);
   return out;
 }
+
+export type CapturePosition = "top" | "bottom";
+
+/**
+ * Adds a line to the inbox note's text. "top" puts it first, after any frontmatter
+ * and a leading "# Title" heading, so the newest capture is the first thing you see.
+ */
+export function insertCaptureLine(data: string, line: string, position: CapturePosition): string {
+  if (!data.trim()) return line + "\n";
+  if (position === "bottom") return data.replace(/\n*$/, "\n") + line + "\n";
+  const fm = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(data);
+  let at = fm ? fm[0].length : 0;
+  const h1 = /^(?:[ \t]*\r?\n)*#[ \t]+[^\n]*(?:\r?\n|$)/.exec(data.slice(at));
+  if (h1) {
+    at += h1[0].length;
+    const blank = /^(?:[ \t]*\r?\n)+/.exec(data.slice(at));
+    if (blank) at += blank[0].length;
+  }
+  const head = data.slice(0, at);
+  const sep = head && !head.endsWith("\n") ? "\n" : "";
+  return head + sep + line + "\n" + data.slice(at);
+}

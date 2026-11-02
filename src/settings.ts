@@ -1,10 +1,13 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type DashboardPlugin from "./main";
+import type { CapturePosition } from "./parser";
 import { DEFAULT_LOG_TYPES, LogType, parseLogTypes } from "./logs";
 
 export interface DashboardSettings {
   /** Where captures are appended. One note, so the mobile widget can open it. */
   inboxPath: string;
+  /** Newest capture first ("top") or last ("bottom"). */
+  capturePosition: CapturePosition;
   /** Where new log notes are created. Empty means the vault root. */
   logsFolder: string;
   /** Frontmatter property that holds the category link, e.g. category: ["[[Books]]"]. */
@@ -19,6 +22,7 @@ export interface DashboardSettings {
 
 export const DEFAULT_SETTINGS: DashboardSettings = {
   inboxPath: "Inbox.md",
+  capturePosition: "top",
   logsFolder: "",
   categoryProperty: "category",
   excludeFolders: "Templates, Bases, Attachments, Categories",
@@ -43,8 +47,12 @@ export class DashboardSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("Capture").setHeading();
     new Setting(containerEl)
       .setName("Inbox note")
-      .setDesc("Quick captures are added to the end of this note. Point your phone widget at it to capture on mobile.")
+      .setDesc("Quick captures are added to this note (top or bottom, see below). Point your phone widget at it to capture on mobile.")
       .addText((t) => t.setPlaceholder("Inbox.md").setValue(s.inboxPath).onChange(async (v) => { s.inboxPath = v.trim() || "Inbox.md"; await save(); }));
+    new Setting(containerEl)
+      .setName("Add new captures at the")
+      .setDesc("Top puts the newest line first, below any properties and a leading # title. Bottom adds to the end.")
+      .addDropdown((d) => d.addOption("top", "Top of the note").addOption("bottom", "Bottom of the note").setValue(s.capturePosition).onChange(async (v) => { s.capturePosition = v as CapturePosition; await save(); }));
     new Setting(containerEl)
       .setName("Nudge when the inbox has")
       .setDesc("The Home page suggests sorting the inbox at this many items.")

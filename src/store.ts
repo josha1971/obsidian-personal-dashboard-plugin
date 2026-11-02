@@ -3,6 +3,7 @@ import type { DashboardSettings } from "./settings";
 import type { LogType } from "./logs";
 import { TaskInfo, parseTaskLine } from "./tasks";
 import { isoDate, parseISODate } from "./dates";
+import { insertCaptureLine } from "./parser";
 
 type Frontmatter = Record<string, unknown>;
 
@@ -162,7 +163,7 @@ export async function appendLine(app: App, settings: DashboardSettings, line: st
   const path = normalizePath(settings.inboxPath);
   const existing = app.vault.getAbstractFileByPath(path);
   if (existing instanceof TFile) {
-    await app.vault.process(existing, (data) => data.replace(/\n*$/, "\n") + line + "\n");
+    await app.vault.process(existing, (data) => insertCaptureLine(data, line, settings.capturePosition));
     return existing;
   }
   const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
