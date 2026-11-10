@@ -136,6 +136,16 @@ describe("plugin smoke test", () => {
     expect(title.value).toBe("");
   });
 
+  it("Library groups by category to start with and remembers the choice", async () => {
+    await render(ctx.plugin, ctx.app, "personal-dashboard-library");
+    expect(ctx.plugin.libraryState.groupKey).toBe("category");
+    ctx.plugin.libraryState.groupKey = "status";
+    ctx.plugin.persistLibrary();
+    expect(ctx.plugin.settings.libraryState!.groupKey).toBe("status");
+    ctx.plugin.libraryState.groupKey = "category";
+    ctx.plugin.persistLibrary();
+  });
+
   it("Library works in every layout", async () => {
     for (const layout of ["list", "board", "calendar"] as const) {
       ctx.plugin.libraryState.layout = layout;

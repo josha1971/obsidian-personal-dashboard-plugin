@@ -133,9 +133,17 @@ export default class DashboardPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const saved = (await this.loadData()) as Partial<DashboardSettings> | null;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+    if (this.settings.libraryState) Object.assign(this.libraryState, this.settings.libraryState);
     if (!Array.isArray(this.settings.logTypes) || !this.settings.logTypes.length) {
       this.settings.logTypes = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.logTypes));
     }
+  }
+
+  /** Remembers how the Library was set up. Does not refresh anything. */
+  persistLibrary(): void {
+    const { category, groupKey, dateKey, layout } = this.libraryState;
+    this.settings.libraryState = { category, groupKey, dateKey, layout };
+    void this.saveData(this.settings);
   }
 
   async saveSettings(): Promise<void> {

@@ -56,7 +56,7 @@ export class LibraryView extends DashView {
     const keys = [...new Set(all.flatMap((n) => Object.keys(n.fm)))].filter((k) => k !== "position").sort();
     const cats = new Map<string, number>();
     for (const n of all) { const c = noteCategory(this.plugin, n); if (c) cats.set(c, (cats.get(c) ?? 0) + 1); }
-    if (!st.groupKey || !keys.includes(st.groupKey)) st.groupKey = ["status", "type", this.plugin.settings.categoryProperty, "category"].find((k) => keys.includes(k)) ?? keys[0] ?? "";
+    if (!st.groupKey || !keys.includes(st.groupKey)) st.groupKey = [this.plugin.settings.categoryProperty, "category", "type", "status"].find((k) => keys.includes(k)) ?? keys[0] ?? "";
     const dateKeys = keys.filter((k) => all.some((n) => parseISODate(String(n.fm[k] ?? "")) !== null));
     if (!st.dateKey || !dateKeys.includes(st.dateKey)) st.dateKey = dateKeys.includes("date") ? "date" : dateKeys.includes("created") ? "created" : dateKeys[0] ?? "";
 
@@ -80,7 +80,7 @@ export class LibraryView extends DashView {
         setIcon(b.createSpan({ cls: "pd-btn-icon" }), icon);
         b.createSpan({ text: label });
         b.toggleClass("is-active", st.layout === v);
-        b.addEventListener("click", () => { st.layout = v; void this.refresh(); });
+        b.addEventListener("click", () => { st.layout = v; this.plugin.persistLibrary(); void this.refresh(); });
       }
     });
     ctl("Category", (w) => {
@@ -88,7 +88,7 @@ export class LibraryView extends DashView {
       sel.createEl("option", { value: "", text: "All notes" });
       for (const [c, n] of [...cats.entries()].sort()) sel.createEl("option", { value: c, text: `${c} (${n})` });
       sel.value = st.category;
-      sel.addEventListener("change", () => { st.category = sel.value; void this.refresh(); });
+      sel.addEventListener("change", () => { st.category = sel.value; this.plugin.persistLibrary(); void this.refresh(); });
     });
     if (st.layout !== "calendar") {
       ctl("Group by", (w) => {
@@ -96,14 +96,14 @@ export class LibraryView extends DashView {
         setTooltip(sel, "Any property in your vault", { delay: 300 });
         for (const k of keys) sel.createEl("option", { value: k, text: k });
         sel.value = st.groupKey;
-        sel.addEventListener("change", () => { st.groupKey = sel.value; void this.refresh(); });
+        sel.addEventListener("change", () => { st.groupKey = sel.value; this.plugin.persistLibrary(); void this.refresh(); });
       });
     } else {
       ctl("Date property", (w) => {
         const sel = w.createEl("select", { cls: "dropdown" });
         for (const k of dateKeys) sel.createEl("option", { value: k, text: k });
         sel.value = st.dateKey;
-        sel.addEventListener("change", () => { st.dateKey = sel.value; void this.refresh(); });
+        sel.addEventListener("change", () => { st.dateKey = sel.value; this.plugin.persistLibrary(); void this.refresh(); });
       });
     }
     const search = bar.createEl("input", { type: "text", cls: "pd-input pd-search", attr: { placeholder: "Filter by name" } });

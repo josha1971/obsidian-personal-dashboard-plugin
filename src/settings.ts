@@ -33,6 +33,8 @@ export interface DashboardSettings {
   gardenSnoozed: Record<string, string>;
   /** Home sections the user switched off. */
   homeHidden: string[];
+  /** The Library's last layout, category and grouping, so it opens the way you left it. */
+  libraryState?: { category: string; groupKey: string; dateKey: string; layout: "list" | "board" | "calendar" };
   logTypes: LogType[];
 }
 
