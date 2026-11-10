@@ -3,17 +3,10 @@ import type DashboardPlugin from "../main";
 import { DashView } from "./base";
 import { VIEW_HOME } from "../constants";
 import { daysBetween, friendlyDate, isoDate, isoWeek, parseISODate, startOfDay } from "../dates";
-import { InboxItem, LogEntry, TaskItem, readInbox } from "../store";
-import { chip, iconButton, renderCaptureBox, renderTaskRow, sectionCard, starButton } from "../ui";
+import { LogEntry, TaskItem, readInbox } from "../store";
+import { NewNoteDraft, chip, iconButton, renderCaptureBox, renderNewNoteBox, renderTaskRow, sectionCard, starButton } from "../ui";
 import { letterExcerpt } from "./lookbackView";
 import { ago } from "./gardenView";
-
-interface NextStep {
-  title: string;
-  detail: string;
-  action: string;
-  run: () => void;
-}
 
 function taskScore(t: TaskItem, today: Date): number {
   if (t.info.state !== "open") return -1;
@@ -31,7 +24,7 @@ function taskScore(t: TaskItem, today: Date): number {
 }
 
 export class HomeView extends DashView {
-  private skipped = 0;
+  private draft: NewNoteDraft = { title: "", text: "" };
 
   constructor(leaf: WorkspaceLeaf, plugin: DashboardPlugin) {
     super(leaf, plugin);
@@ -78,7 +71,6 @@ export class HomeView extends DashView {
 
     const open = tasks.filter((t) => t.info.state === "open");
     const overdue = open.filter((t) => t.info.due && daysBetween(today, parseISODate(t.info.due) ?? today) < 0);
-    const dueToday = open.filter((t) => t.info.due === todayIso);
     const doneToday = tasks.filter((t) => t.info.state === "done" && t.info.doneDate === todayIso).length;
     const weekAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
     const loggedThisWeek = logs.filter((l) => (parseISODate(l.date) ?? 0) >= weekAgo);
@@ -100,7 +92,8 @@ export class HomeView extends DashView {
     // Top row: next best step + the day at a glance
     const top = el.createDiv({ cls: "pd-toprow" });
     if (!this.shown("stats")) top.addClass("is-single");
-    this.renderNextStep(top, this.nextSteps(open, overdue, dueToday, inbox, loggedThisWeek, dueDecisions.length ? dueDecisions[0].file : null, today));
+    const nn = sectionCard(top, "New note", "start writing, it opens in a new tab", "pd-newnote").body;
+    renderNewNoteBox(nn, this.plugin, this.draft);
     if (this.shown("stats")) {
       const stats = sectionCard(top, "Today's rhythm", "", "pd-stats-card").body;
       const grid = stats.createDiv({ cls: "pd-stats" });
@@ -205,54 +198,5 @@ export class HomeView extends DashView {
     if (l.detail) row.createSpan({ text: l.detail, cls: "pd-muted pd-logrow-detail" });
     if (l.rating !== undefined) chip(row, `${l.rating}/10`, "is-rating");
     row.createSpan({ text: friendlyDate(l.date, today), cls: "pd-muted pd-logrow-date" });
-  }
-
-  private nextSteps(open: TaskItem[], overdue: TaskItem[], dueToday: TaskItem[], inbox: InboxItem[], loggedThisWeek: LogEntry[], decision: TFile | null, today: Date): NextStep[] {
-    const s = this.plugin.settings;
-    const out: NextStep[] = [];
-    const goTasks = () => void this.plugin.navigate(this.leaf, "tasks");
-    if (overdue.length) {
-      out.push({ title: `${overdue.length} ${overdue.length === 1 ? "task is" : "tasks are"} overdue`, detail: "Finish, reschedule or drop them. It takes a couple of minutes.", action: "Open tasks", run: goTasks });
-    }
-    if (decision) {
-      out.push({ title: `How did "${decision.basename}" go?`, detail: "You asked yourself to check on this decision. It takes about two minutes.", action: "Look back", run: () => void this.plugin.openLookBack(decision) });
-    }
-    const dated = inbox.filter((i) => i.added).map((i) => daysBetween(parseISODate(i.added!) ?? today, today));
-    const oldest = dated.length ? Math.max(...dated) : 0;
-    if (inbox.length >= s.inboxNudgeCount || (inbox.length > 0 && oldest >= s.inboxNudgeDays)) {
-      const age = oldest >= s.inboxNudgeDays ? `, the oldest is ${oldest} days old` : "";
-      out.push({ title: `${inbox.length} things are waiting in the inbox${age}`, detail: "Sort a few now: turn them into notes, tasks, or delete them.", action: "Sort them", run: () => void this.plugin.openInbox() });
-    }
-    if (dueToday.length) {
-      out.push({ title: `${dueToday.length} ${dueToday.length === 1 ? "task is" : "tasks are"} due today`, detail: dueToday[0].info.text, action: "Open tasks", run: goTasks });
-    }
-    if (loggedThisWeek.length === 0) {
-      out.push({ title: "Nothing logged this week", detail: "A film, a meal, a coffee, a thought. A line is enough.", action: "Log something", run: () => this.plugin.openLogModal() });
-    }
-    if (!out.length) {
-      out.push({
-        title: open.length ? "You're on top of things" : "Everything is clear",
-        detail: open.length ? `${open.length} open tasks, none overdue or due today.` : "No open tasks and an empty inbox.",
-        action: "Capture a thought",
-        run: () => this.plugin.openCaptureModal(),
-      });
-    }
-    return out;
-  }
-
-  private renderNextStep(parent: HTMLElement, steps: NextStep[]): void {
-    const step = steps[this.skipped % steps.length];
-    const card = parent.createDiv({ cls: "pd-card pd-next" });
-    card.createDiv({ cls: "pd-kicker", text: "Next best step" });
-    card.createEl("h3", { cls: "pd-next-title", text: step.title });
-    card.createDiv({ cls: "pd-muted", text: step.detail });
-    const row = card.createDiv({ cls: "pd-next-actions" });
-    const go = row.createEl("button", { text: step.action, cls: "pd-btn mod-cta" });
-    setTooltip(go, "Chosen by simple rules: overdue, decisions due, inbox size, due today, then logging", { delay: 300 });
-    go.addEventListener("click", step.run);
-    if (steps.length > 1) {
-      const other = row.createEl("button", { text: "Something else", cls: "pd-link" });
-      other.addEventListener("click", () => { this.skipped++; void this.refresh(); });
-    }
   }
 }

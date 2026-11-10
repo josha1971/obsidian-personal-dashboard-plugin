@@ -31,6 +31,7 @@ function makeApp() {
   };
   const app: any = {
     files,
+    opened: [] as string[],
     vault: {
       getMarkdownFiles: () => [...files.values()].map((x) => x.file).filter((f) => f.extension === "md"),
       getAbstractFileByPath: (p: string) => files.get(p)?.file ?? null,
@@ -52,7 +53,7 @@ function makeApp() {
       processFrontMatter: async (f: TFile, fn: (fm: any) => void) => { const fx = files.get(f.path)!; fx.fm = fx.fm ?? {}; fn(fx.fm); },
       trashFile: async (f: TFile) => { files.delete(f.path); },
     },
-    workspace: { getLeavesOfType: () => [], getLeaf: () => ({ openFile: async () => {}, setViewState: async () => {} }), revealLeaf() {}, getActiveFile: () => null, on: () => ({}) },
+    workspace: { getLeavesOfType: () => [], getLeaf: () => ({ openFile: async (f: TFile) => { app.opened.push(f.path); }, setViewState: async () => {} }), revealLeaf() {}, getActiveFile: () => null, on: () => ({}) },
     commands: { executeCommandById: () => true },
     loadLocalStorage: () => null,
     saveLocalStorage: () => {},
@@ -114,6 +115,25 @@ describe("plugin smoke test", () => {
     expect(text).toContain("How did \"Raise prices\" go?");
     expect(text).toContain("Autumn market stall");
     expect(text).toContain("From the garden");
+  });
+
+  it("Home has a New note box that creates the note and opens it in a new tab", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    expect(v.contentEl.textContent).not.toContain("Next best step");
+    const card = [...v.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.textContent!.includes("New note")) as HTMLElement;
+    const [title] = card.querySelectorAll("input") as any;
+    const area = card.querySelector("textarea") as HTMLTextAreaElement;
+    title.value = "Market sign ideas"; title.dispatchEvent(new Event("input"));
+    area.value = "Chalkboard, or wood?"; area.dispatchEvent(new Event("input"));
+    expect(card.querySelector(".pd-newnote-hint")!.textContent).toMatch(/Market sign ideas \d{4}-\d{2}-\d{2} \d{4}\.md/);
+    (card.querySelector(".mod-cta") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    const key = [...ctx.files.keys()].find((k) => k.startsWith("Market sign ideas "))!;
+    expect(key).toBeTruthy();
+    expect(ctx.files.get(key)!.content).toContain("Chalkboard, or wood?");
+    expect(ctx.files.get(key)!.content).toMatch(/^---\ncreated: .*\ntags:\ncategory:\n---\n/);
+    expect(ctx.app.opened).toContain(key);
+    expect(title.value).toBe("");
   });
 
   it("Library works in every layout", async () => {

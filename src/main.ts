@@ -16,6 +16,7 @@ import { CaptureModal, LogModal } from "./modals";
 import { CatNote, FavoriteItem, LogEntry, TaskItem, appendLine, collectFavorites, collectLogs, isExcluded, noteDate, notesInCategory, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
 import { CaptureMode, describeCapture, formatCaptureLine, parseCapture } from "./parser";
 import { toggleLine } from "./tasks";
+import { buildQuickNote } from "./notes";
 import { LogType } from "./logs";
 import { undoNotice } from "./ui";
 import { isFlagged } from "./favorites";
@@ -345,6 +346,20 @@ export default class DashboardPlugin extends Plugin {
       return true;
     } catch (e) {
       new Notice(`Could not capture: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
+  /** Creates a new note from Home and opens it in a new tab so you can keep writing. */
+  async createQuickNote(title: string, body: string): Promise<boolean> {
+    if (!title.trim() && !body.trim()) return false;
+    const n = buildQuickNote(title, body, new Date(), this.settings.newNoteDatePosition);
+    try {
+      const file = await this.createNote(n.filename, n.content);
+      await this.app.workspace.getLeaf("tab").openFile(file);
+      return true;
+    } catch (e) {
+      new Notice(`Could not create the note: ${(e as Error).message}`);
       return false;
     }
   }

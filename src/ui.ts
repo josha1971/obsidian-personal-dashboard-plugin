@@ -3,6 +3,7 @@ import type DashboardPlugin from "./main";
 import type { TaskItem } from "./store";
 import type { TFile } from "obsidian";
 import { friendlyDate, daysBetween, parseISODate } from "./dates";
+import { buildQuickNote } from "./notes";
 import { CaptureMode, describeCapture, formatCaptureLine, formatDuration, parseCapture } from "./parser";
 
 /** A toast with one Undo button. */
@@ -152,4 +153,49 @@ export function starButton(parent: HTMLElement, file: TFile, on: boolean, plugin
     void plugin.toggleFavorite(file);
   });
   return b;
+}
+
+/** The draft in the New note box. Kept by the page so a refresh does not wipe what you are typing. */
+export interface NewNoteDraft { title: string; text: string }
+
+/** Two fields: a title and a start for the note. Creating it opens the note in a new tab. */
+export function renderNewNoteBox(parent: HTMLElement, plugin: DashboardPlugin, draft: NewNoteDraft): void {
+  const title = parent.createEl("input", { type: "text", cls: "pd-input", attr: { placeholder: "Title. The date and time are added for you" } });
+  setTooltip(title, "The note is named with your title plus the date and time", { delay: 500 });
+  title.value = draft.title;
+  const area = parent.createEl("textarea", { cls: "pd-input pd-textarea pd-newnote-text", attr: { placeholder: "Start writing..." } });
+  area.value = draft.text;
+  const foot = parent.createDiv({ cls: "pd-newnote-foot" });
+  const hint = foot.createSpan({ cls: "pd-muted pd-grow pd-newnote-hint" });
+  const create = foot.createEl("button", { text: "Create and open", cls: "pd-btn mod-cta" });
+  setTooltip(create, "Creates a new note and opens it in a new tab (Ctrl/Cmd+Enter)", { delay: 300 });
+
+  const paint = () => {
+    const n = buildQuickNote(draft.title, draft.text, new Date(), plugin.settings.newNoteDatePosition);
+    const folder = plugin.settings.logsFolder;
+    hint.setText(`Will be saved as ${folder ? folder + "/" : ""}${n.filename}`);
+  };
+  title.addEventListener("input", () => { draft.title = title.value; paint(); });
+  area.addEventListener("input", () => { draft.text = area.value; paint(); });
+  const submit = async () => {
+    if (await plugin.createQuickNote(draft.title, draft.text)) {
+      draft.title = "";
+      draft.text = "";
+      title.value = "";
+      area.value = "";
+      paint();
+    } else if (!draft.title.trim() && !draft.text.trim()) {
+      new Notice("Add a title or some text first");
+    }
+  };
+  create.addEventListener("click", () => void submit());
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); void submit(); }
+  };
+  title.addEventListener("keydown", onKey);
+  area.addEventListener("keydown", onKey);
+  title.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); area.focus(); }
+  });
+  paint();
 }
