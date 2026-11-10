@@ -1,7 +1,6 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type DashboardPlugin from "./main";
 import type { CapturePosition } from "./parser";
-import type { DatePosition } from "./notes";
 import { DEFAULT_LOG_TYPES, LogType, parseLogTypes } from "./logs";
 
 export interface DashboardSettings {
@@ -19,8 +18,6 @@ export interface DashboardSettings {
   favoriteFiles: string[];
   /** Folders whose notes are ignored by Tasks and Logs. Comma separated. */
   excludeFolders: string;
-  /** Where the date goes in the name of notes made from Home: "Idea 2026-11-10 1430" or "2026-11-10 1430 Idea". */
-  newNoteDatePosition: DatePosition;
   /** Category pages for the notes the plugin creates besides logs. */
   reviewCategory: string;
   decisionCategory: string;
@@ -47,7 +44,6 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   favoriteProperty: "favorite",
   favoriteFiles: [],
   excludeFolders: "Templates, Bases, Attachments, Categories",
-  newNoteDatePosition: "after",
   reviewCategory: "Reviews",
   decisionCategory: "Decisions",
   letterCategory: "Letters",
@@ -104,10 +100,6 @@ export class DashboardSettingTab extends PluginSettingTab {
       .setName("New notes go in")
       .setDesc("Where logs, reviews, letters, decisions and freewrites are created. Leave empty for the vault root.")
       .addText((t) => t.setPlaceholder("(vault root)").setValue(s.logsFolder).onChange(async (v) => { s.logsFolder = v.trim().replace(/^\/+|\/+$/g, ""); await save(); }));
-    new Setting(containerEl)
-      .setName("Date in new note names")
-      .setDesc("Notes made from the New note box on Home get the date and time added to the title you type.")
-      .addDropdown((d) => d.addOption("after", "After the title (Idea 2026-11-10 1430)").addOption("before", "Before the title (2026-11-10 1430 Idea)").setValue(s.newNoteDatePosition).onChange(async (v) => { s.newNoteDatePosition = v as DatePosition; await save(); }));
     new Setting(containerEl)
       .setName("Ignore these folders")
       .setDesc("Comma separated. Tasks and Logs skip notes inside them (templates, bases, category pages...).")

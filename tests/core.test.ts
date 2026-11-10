@@ -255,12 +255,11 @@ describe("explore", () => {
 
 import { buildQuickNote } from "../src/notes";
 describe("quick note", () => {
-  it("adds the date after or before the title", () => {
-    expect(buildQuickNote("Idea: pasta?", "Start.", today, "after").filename).toBe("Idea pasta 2026-11-02 0930.md");
-    expect(buildQuickNote("Idea", "", today, "before").filename).toBe("2026-11-02 0930 Idea.md");
-    expect(buildQuickNote("", "x", today, "after").filename).toBe("Note 2026-11-02 0930.md");
+  it("puts the date first, then a dash, then the title", () => {
+    expect(buildQuickNote("Idea: pasta?", "Start.", today).filename).toBe("2026-11-02 - Idea pasta.md");
+    expect(buildQuickNote("", "x", today).filename).toBe("2026-11-02 - Note.md");
   });
   it("writes template-style properties and the text", () => {
-    expect(buildQuickNote("Idea", "Start.", today, "after").content).toBe("---\ncreated: 2026-11-02T09:30:00\ntags:\ncategory:\n---\nStart.\n");
+    expect(buildQuickNote("Idea", "Start.", today).content).toBe("---\ncreated: 2026-11-02T09:30:00\ntags:\ncategory:\n---\nStart.\n");
   });
 });

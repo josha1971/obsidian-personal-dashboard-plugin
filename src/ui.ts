@@ -160,8 +160,8 @@ export interface NewNoteDraft { title: string; text: string }
 
 /** Two fields: a title and a start for the note. Creating it opens the note in a new tab. */
 export function renderNewNoteBox(parent: HTMLElement, plugin: DashboardPlugin, draft: NewNoteDraft): void {
-  const title = parent.createEl("input", { type: "text", cls: "pd-input", attr: { placeholder: "Title. The date and time are added for you" } });
-  setTooltip(title, "The note is named with your title plus the date and time", { delay: 500 });
+  const title = parent.createEl("input", { type: "text", cls: "pd-input", attr: { placeholder: "Title. The date is added in front of it" } });
+  setTooltip(title, "The note is named like 2026-11-10 - Your title", { delay: 500 });
   title.value = draft.title;
   const area = parent.createEl("textarea", { cls: "pd-input pd-textarea pd-newnote-text", attr: { placeholder: "Start writing..." } });
   area.value = draft.text;
@@ -171,7 +171,7 @@ export function renderNewNoteBox(parent: HTMLElement, plugin: DashboardPlugin, d
   setTooltip(create, "Creates a new note and opens it in a new tab (Ctrl/Cmd+Enter)", { delay: 300 });
 
   const paint = () => {
-    const n = buildQuickNote(draft.title, draft.text, new Date(), plugin.settings.newNoteDatePosition);
+    const n = buildQuickNote(draft.title, draft.text, new Date());
     const folder = plugin.settings.logsFolder;
     hint.setText(`Will be saved as ${folder ? folder + "/" : ""}${n.filename}`);
   };

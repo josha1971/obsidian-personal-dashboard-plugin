@@ -353,7 +353,7 @@ export default class DashboardPlugin extends Plugin {
   /** Creates a new note from Home and opens it in a new tab so you can keep writing. */
   async createQuickNote(title: string, body: string): Promise<boolean> {
     if (!title.trim() && !body.trim()) return false;
-    const n = buildQuickNote(title, body, new Date(), this.settings.newNoteDatePosition);
+    const n = buildQuickNote(title, body, new Date());
     try {
       const file = await this.createNote(n.filename, n.content);
       await this.app.workspace.getLeaf("tab").openFile(file);

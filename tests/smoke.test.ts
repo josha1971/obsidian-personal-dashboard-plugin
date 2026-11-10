@@ -125,10 +125,10 @@ describe("plugin smoke test", () => {
     const area = card.querySelector("textarea") as HTMLTextAreaElement;
     title.value = "Market sign ideas"; title.dispatchEvent(new Event("input"));
     area.value = "Chalkboard, or wood?"; area.dispatchEvent(new Event("input"));
-    expect(card.querySelector(".pd-newnote-hint")!.textContent).toMatch(/Market sign ideas \d{4}-\d{2}-\d{2} \d{4}\.md/);
+    expect(card.querySelector(".pd-newnote-hint")!.textContent).toMatch(/\d{4}-\d{2}-\d{2} - Market sign ideas\.md/);
     (card.querySelector(".mod-cta") as HTMLElement).click();
     await new Promise((r) => setTimeout(r, 20));
-    const key = [...ctx.files.keys()].find((k) => k.startsWith("Market sign ideas "))!;
+    const key = [...ctx.files.keys()].find((k) => /^\d{4}-\d{2}-\d{2} - Market sign ideas\.md$/.test(k))!;
     expect(key).toBeTruthy();
     expect(ctx.files.get(key)!.content).toContain("Chalkboard, or wood?");
     expect(ctx.files.get(key)!.content).toMatch(/^---\ncreated: .*\ntags:\ncategory:\n---\n/);

@@ -1,4 +1,4 @@
-import { isoDate, isoDateTime, pad } from "./dates";
+import { isoDate, isoDateTime } from "./dates";
 import { safeFileName, yamlString } from "./logs";
 
 /** A value written as is (for dates, so they are not quoted). */
@@ -34,17 +34,13 @@ export function wordCount(s: string): number {
   return m ? m.length : 0;
 }
 
-export type DatePosition = "after" | "before";
-
 /**
- * A new note from the Home page. The date and time are added to the title you type:
- * "Idea 2026-11-10 1430" (after) or "2026-11-10 1430 Idea" (before).
- * The properties match a usual template: created, tags, category (the last two left empty to fill in).
+ * A new note from Home. The date always goes first, then " - ", then your title:
+ * "2026-11-10 - Market sign ideas". The properties match a usual template:
+ * created, tags, category (the last two left empty to fill in).
  */
-export function buildQuickNote(title: string, body: string, now: Date, position: DatePosition): { filename: string; content: string } {
-  const stamp = `${isoDate(now)} ${pad(now.getHours())}${pad(now.getMinutes())}`;
+export function buildQuickNote(title: string, body: string, now: Date): { filename: string; content: string } {
   const base = safeFileName(title) || "Note";
-  const name = position === "before" ? `${stamp} ${base}` : `${base} ${stamp}`;
   const content = buildNoteText([["created", raw(isoDateTime(now))], ["tags", raw("")], ["category", raw("")]], body);
-  return { filename: `${name}.md`, content };
+  return { filename: `${isoDate(now)} - ${base}.md`, content };
 }
