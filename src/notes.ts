@@ -36,11 +36,12 @@ export function wordCount(s: string): number {
 
 /**
  * A new note from Home. The date always goes first, then " - ", then your title:
- * "2026-11-10 - Market sign ideas". The properties match a usual template:
- * created, tags, category (the last two left empty to fill in).
+ * "2026-11-10 - Market sign ideas". It is filed under the clipboard category so it
+ * shows up in "Review Clipboard" until you give it a proper one. Properties follow a usual
+ * template: created, tags (left empty), category.
  */
-export function buildQuickNote(title: string, body: string, now: Date): { filename: string; content: string } {
+export function buildQuickNote(title: string, body: string, now: Date, opts: { category: string; categoryProperty: string }): { filename: string; content: string } {
   const base = safeFileName(title) || "Note";
-  const content = buildNoteText([["created", raw(isoDateTime(now))], ["tags", raw("")], ["category", raw("")]], body);
+  const content = buildNoteText([["created", raw(isoDateTime(now))], ["tags", raw("")], [opts.categoryProperty, [wikilink(opts.category)]]], body);
   return { filename: `${isoDate(now)} - ${base}.md`, content };
 }

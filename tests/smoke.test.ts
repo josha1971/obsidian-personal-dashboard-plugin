@@ -74,6 +74,9 @@ async function setup() {
   add("Raise prices.md", "## The decision\nRaise them.", { category: ["[[Decisions]]"], status: "open", decided: day(-30), lookback: day(-1) });
   add("Draft essay.md", "words words", { status: "draft", created: day(-5) + "T10:00:00" });
   add("Old idea.md", "x".repeat(600) + " What did I forget?", { created: day(-400) + "T10:00:00", topics: ["Baking"] }, 400);
+  add("Clip new.md", "fresh", { category: ["[[Clipboard]]"], created: day(-1) + "T09:00:00" });
+  add("No category.md", "empty category", { category: null, created: day(-5) + "T09:00:00" });
+  add("No category either.md", "empty list", { categories: [], created: day(-2) + "T09:00:00" });
   add("Whiteboard.canvas", "{}");
   add("Categories/Books.md", "category page", { tags: "categories" });
   app.metadataCache.resolvedLinks = { "Pine & Plum.md": { "Plans/Autumn market stall.md": 1 }, "Taco Place.md": { "Plans/Autumn market stall.md": 1 } };
@@ -112,7 +115,7 @@ describe("plugin smoke test", () => {
     const text = v.contentEl.textContent!;
     expect(text).toContain("From past you");
     expect(text).toContain("Dear future me");
-    expect(text).toContain("How did \"Raise prices\" go?");
+    expect(text).not.toContain("Next steps");
     expect(text).toContain("Autumn market stall");
     expect(text).toContain("From the garden");
   });
@@ -131,9 +134,21 @@ describe("plugin smoke test", () => {
     const key = [...ctx.files.keys()].find((k) => /^\d{4}-\d{2}-\d{2} - Market sign ideas\.md$/.test(k))!;
     expect(key).toBeTruthy();
     expect(ctx.files.get(key)!.content).toContain("Chalkboard, or wood?");
-    expect(ctx.files.get(key)!.content).toMatch(/^---\ncreated: .*\ntags:\ncategory:\n---\n/);
+    expect(ctx.files.get(key)!.content).toMatch(/^---\ncreated: .*\ntags:\ncategory:\n  - "\[\[Clipboard\]\]"\n---\n/);
     expect(ctx.app.opened).toContain(key);
     expect(title.value).toBe("");
+  });
+
+  it("Review Clipboard lists clipboard notes and empty-category notes, newest first", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    const card = [...v.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.querySelector(".pd-card-title")?.textContent === "Review Clipboard") as HTMLElement;
+    expect(card).toBeTruthy();
+    const names = [...card.querySelectorAll(".pd-logrow-name")].map((e) => e.textContent);
+    expect(names.slice(0, 3)).toEqual(["Clip new", "No category either", "No category"]);
+    expect(names).not.toContain("Pine & Plum");
+    expect(names).not.toContain("Books");
+    expect(card.textContent).toContain("No category");
+    expect(card.textContent).toContain("Clipboard");
   });
 
   it("Library groups by category to start with and remembers the choice", async () => {

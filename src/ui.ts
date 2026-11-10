@@ -168,10 +168,10 @@ export function renderNewNoteBox(parent: HTMLElement, plugin: DashboardPlugin, d
   const foot = parent.createDiv({ cls: "pd-newnote-foot" });
   const hint = foot.createSpan({ cls: "pd-muted pd-grow pd-newnote-hint" });
   const create = foot.createEl("button", { text: "Create and open", cls: "pd-btn mod-cta" });
-  setTooltip(create, "Creates a new note and opens it in a new tab (Ctrl/Cmd+Enter)", { delay: 300 });
+  setTooltip(create, "Creates a new note filed under Clipboard and opens it in a new tab (Ctrl/Cmd+Enter)", { delay: 300 });
 
   const paint = () => {
-    const n = buildQuickNote(draft.title, draft.text, new Date());
+    const n = buildQuickNote(draft.title, draft.text, new Date(), { category: plugin.settings.clipboardCategory, categoryProperty: plugin.settings.categoryProperty });
     const folder = plugin.settings.logsFolder;
     hint.setText(`Will be saved as ${folder ? folder + "/" : ""}${n.filename}`);
   };

@@ -1,27 +1,12 @@
-import { Notice, TFile, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
+import { Notice, WorkspaceLeaf, setTooltip } from "obsidian";
 import type DashboardPlugin from "../main";
 import { DashView } from "./base";
 import { VIEW_HOME } from "../constants";
 import { daysBetween, friendlyDate, isoDate, isoWeek, parseISODate, startOfDay } from "../dates";
-import { LogEntry, TaskItem, readInbox } from "../store";
-import { NewNoteDraft, chip, iconButton, renderCaptureBox, renderNewNoteBox, renderTaskRow, sectionCard, starButton } from "../ui";
+import { LogEntry, readInbox } from "../store";
+import { NewNoteDraft, chip, iconButton, renderCaptureBox, renderNewNoteBox, sectionCard, starButton } from "../ui";
 import { letterExcerpt } from "./lookbackView";
 import { ago } from "./gardenView";
-
-function taskScore(t: TaskItem, today: Date): number {
-  if (t.info.state !== "open") return -1;
-  const due = t.info.due ? daysBetween(today, parseISODate(t.info.due) ?? today) : undefined;
-  let score = 0;
-  if (due !== undefined) {
-    if (due < 0) score = 100 + Math.min(-due, 30);
-    else if (due === 0) score = 90;
-    else if (due <= 3) score = 60 - due;
-    else score = 20;
-  }
-  if (t.info.priority === "high") score += 30;
-  else if (t.info.priority === "medium") score += 10;
-  return score;
-}
 
 export class HomeView extends DashView {
   private draft: NewNoteDraft = { title: "", text: "" };
@@ -46,7 +31,6 @@ export class HomeView extends DashView {
 
     const arrived = this.plugin.getLetters().filter((l) => l.deliver <= todayIso && !l.kept);
     const letterText = arrived.length ? await letterExcerpt(this.plugin, arrived[0].file) : "";
-    const dueDecisions = this.plugin.getDecisions().filter((d) => d.status !== "reviewed" && d.lookback && d.lookback <= todayIso);
     if (!isCurrent()) return;
 
     const el = this.contentEl;
@@ -107,18 +91,8 @@ export class HomeView extends DashView {
     // Favorites, near the top so they are one click away
     if (this.shown("favorites")) this.renderFavorites(el);
 
-    // Next steps
-    if (this.shown("nextSteps")) {
-      const ranked = open.map((t) => ({ t, s: taskScore(t, today) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 6);
-      const extras = dueDecisions.length;
-      const steps = sectionCard(el, "Next steps", ranked.length + extras ? "most useful first" : "", "pd-tone-red");
-      for (const d of dueDecisions.slice(0, 2)) this.actionRow(steps.body, "flag", `How did "${d.file.basename}" go?`, `You chose ${friendlyDate(d.decided, today)} to look back on this decision`, "Look back", () => void this.plugin.openLookBack(d.file));
-      if (!ranked.length && !extras) {
-        steps.body.createDiv({ cls: "pd-empty", text: open.length ? "Nothing is due or marked important. Open Tasks to pick something." : "No open tasks. Capture one above." });
-      } else {
-        for (const { t } of ranked) renderTaskRow(steps.body, t, this.plugin, today);
-      }
-    }
+    // Review Clipboard: new notes waiting for a proper category
+    if (this.shown("clipboard")) this.renderClipboard(el, today);
 
     // Recent logs
     if (this.shown("recentLogs")) {
@@ -149,14 +123,24 @@ export class HomeView extends DashView {
     if (!cmds.executeCommandById("daily-notes")) new Notice("Turn on the Daily notes core plugin to use Journal.");
   }
 
-  private actionRow(parent: HTMLElement, icon: string, title: string, detail: string, action: string, run: () => void): void {
-    const row = parent.createDiv({ cls: "pd-task" });
-    setIcon(row.createDiv({ cls: "pd-rowicon" }), icon);
-    const main = row.createDiv({ cls: "pd-task-main" });
-    main.createDiv({ text: title, cls: "pd-task-text" });
-    main.createDiv({ text: detail, cls: "pd-muted pd-task-meta" });
-    const b = row.createEl("button", { text: action, cls: "pd-btn mod-cta" });
-    b.addEventListener("click", run);
+  private renderClipboard(parent: HTMLElement, today: Date): void {
+    const items = this.plugin.getClipboard();
+    const name = this.plugin.settings.clipboardCategory;
+    const card = sectionCard(parent, "Review Clipboard", items.length ? `${items.length} ${items.length === 1 ? "note" : "notes"} · newest first` : "", "pd-tone-red");
+    if (!items.length) {
+      card.body.createDiv({ cls: "pd-empty", text: `Nothing to review. Notes made from New note are filed under ${name}, and notes with an empty category show up here too.` });
+      return;
+    }
+    const list = card.body.createDiv({ cls: "pd-scroll" });
+    for (const it of items) {
+      const row = list.createDiv({ cls: "pd-logrow" });
+      const title = row.createSpan({ text: it.file.basename, cls: "pd-logrow-name" });
+      title.addEventListener("click", () => void this.plugin.openFile(it.file));
+      setTooltip(title, "Open in a new tab to set its category", { delay: 400 });
+      chip(row, it.unassigned ? "No category" : name, it.unassigned ? "is-overdue" : "is-type");
+      if (it.file.parent && !it.file.parent.isRoot()) row.createSpan({ text: it.file.parent.name, cls: "pd-muted pd-logrow-detail" });
+      row.createSpan({ text: friendlyDate(isoDate(new Date(it.created)), today), cls: "pd-muted pd-logrow-date" });
+    }
   }
 
   private renderFavorites(parent: HTMLElement): void {

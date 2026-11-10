@@ -13,7 +13,7 @@ import { OverviewView } from "./views/overviewView";
 import { TasksView } from "./views/tasksView";
 import { LogsView } from "./views/logsView";
 import { CaptureModal, LogModal } from "./modals";
-import { CatNote, FavoriteItem, LogEntry, TaskItem, appendLine, collectFavorites, collectLogs, isExcluded, noteDate, notesInCategory, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
+import { CatNote, FavoriteItem, LogEntry, TaskItem, appendLine, collectFavorites, collectLogs, isExcluded, linkTarget, noteDate, notesInCategory, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
 import { CaptureMode, describeCapture, formatCaptureLine, parseCapture } from "./parser";
 import { toggleLine } from "./tasks";
 import { buildQuickNote } from "./notes";
@@ -167,6 +167,30 @@ export default class DashboardPlugin extends Plugin {
 
   getLogs(): LogEntry[] {
     return (this.logCache ??= collectLogs(this.app, this.settings));
+  }
+
+  /**
+   * Notes to review: everything filed under the clipboard category, plus notes that have a
+   * category property but nothing in it. Newest created first.
+   */
+  getClipboard(): { file: TFile; created: number; unassigned: boolean }[] {
+    const s = this.settings;
+    const want = s.clipboardCategory.toLowerCase();
+    const sealed = this.sealedPaths();
+    const keys = [s.categoryProperty, "categories"];
+    const out: { file: TFile; created: number; unassigned: boolean }[] = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (isExcluded(file, s) || file.path === s.inboxPath || sealed.has(file.path)) continue;
+      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined;
+      if (!fm) continue;
+      const cats = keys.flatMap((k) => (Array.isArray(fm[k]) ? (fm[k] as unknown[]) : fm[k] == null ? [] : [fm[k]])).map((v) => linkTarget(v).toLowerCase()).filter(Boolean);
+      const hasKey = keys.some((k) => Object.prototype.hasOwnProperty.call(fm, k));
+      const inClipboard = cats.includes(want);
+      if (!inClipboard && !(hasKey && cats.length === 0)) continue;
+      const made = Date.parse(String(fm["created"] ?? ""));
+      out.push({ file, created: Number.isFinite(made) ? made : file.stat.ctime, unassigned: !inClipboard });
+    }
+    return out.sort((a, b) => b.created - a.created);
   }
 
   /** Words saved from Write on a given day (YYYY-MM-DD). */
@@ -361,7 +385,7 @@ export default class DashboardPlugin extends Plugin {
   /** Creates a new note from Home and opens it in a new tab so you can keep writing. */
   async createQuickNote(title: string, body: string): Promise<boolean> {
     if (!title.trim() && !body.trim()) return false;
-    const n = buildQuickNote(title, body, new Date());
+    const n = buildQuickNote(title, body, new Date(), { category: this.settings.clipboardCategory, categoryProperty: this.settings.categoryProperty });
     try {
       const file = await this.createNote(n.filename, n.content);
       await this.app.workspace.getLeaf("tab").openFile(file);

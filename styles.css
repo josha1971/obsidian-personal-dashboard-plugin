@@ -244,3 +244,6 @@
 .pd-newnote-text { min-height: 110px; flex: 1; resize: vertical; }
 .pd-newnote-foot { display: flex; align-items: center; gap: 10px; }
 .pd-newnote-hint { font-size: var(--font-ui-smaller); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Review Clipboard: a long list stays inside its card */
+.pd-scroll { max-height: 420px; overflow-y: auto; }

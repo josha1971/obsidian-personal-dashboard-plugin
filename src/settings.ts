@@ -23,6 +23,8 @@ export interface DashboardSettings {
   decisionCategory: string;
   letterCategory: string;
   writeCategory: string;
+  /** Notes made from Home are filed here, and Home lists them (plus notes with an empty category) for review. */
+  clipboardCategory: string;
   /** Daily words goal for Write. */
   writeGoal: number;
   /** Garden brings back notes not touched for this many days. */
@@ -50,6 +52,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   decisionCategory: "Decisions",
   letterCategory: "Letters",
   writeCategory: "Writing",
+  clipboardCategory: "Clipboard",
   writeGoal: 300,
   gardenDays: 120,
   gardenCount: 5,
@@ -62,7 +65,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
 export const HOME_SECTIONS: [string, string][] = [
   ["stats", "At a glance numbers"],
   ["favorites", "Favorites"],
-  ["nextSteps", "Next steps"],
+  ["clipboard", "Review Clipboard"],
   ["recentLogs", "Recent logs"],
   ["garden", "From the garden"],
 ];
@@ -119,12 +122,13 @@ export class DashboardSettingTab extends PluginSettingTab {
     }
 
     new Setting(containerEl).setName("Other pages").setHeading();
-    const text = (name: string, desc: string, key: "reviewCategory" | "decisionCategory" | "letterCategory" | "writeCategory") =>
+    const text = (name: string, desc: string, key: "reviewCategory" | "decisionCategory" | "letterCategory" | "writeCategory" | "clipboardCategory") =>
       new Setting(containerEl).setName(name).setDesc(desc).addText((t) => t.setValue(s[key]).onChange(async (v) => { s[key] = v.trim() || DEFAULT_SETTINGS[key]; await save(); }));
     text("Review category", "Weekly review notes are filed under this category page, e.g. [[Reviews]].", "reviewCategory");
     text("Decision category", "Decision log notes use this category.", "decisionCategory");
     text("Letter category", "Letters to future you use this category.", "letterCategory");
     text("Writing category", "Freewrite notes from the Write page use this category.", "writeCategory");
+    text("Clipboard category", "Notes made from the New note box on Home are filed here. Review Clipboard also lists notes with an empty category.", "clipboardCategory");
     const num = (name: string, desc: string, key: "writeGoal" | "gardenDays" | "gardenCount", min: number) =>
       new Setting(containerEl).setName(name).setDesc(desc).addText((t) => t.setValue(String(s[key])).onChange(async (v) => { s[key] = Math.max(min, parseInt(v) || DEFAULT_SETTINGS[key]); await save(); }));
     num("Daily word goal", "Shown on Write and Home.", "writeGoal", 1);

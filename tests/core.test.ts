@@ -255,11 +255,12 @@ describe("explore", () => {
 
 import { buildQuickNote } from "../src/notes";
 describe("quick note", () => {
+  const o = { category: "Clipboard", categoryProperty: "category" };
   it("puts the date first, then a dash, then the title", () => {
-    expect(buildQuickNote("Idea: pasta?", "Start.", today).filename).toBe("2026-11-02 - Idea pasta.md");
-    expect(buildQuickNote("", "x", today).filename).toBe("2026-11-02 - Note.md");
+    expect(buildQuickNote("Idea: pasta?", "Start.", today, o).filename).toBe("2026-11-02 - Idea pasta.md");
+    expect(buildQuickNote("", "x", today, o).filename).toBe("2026-11-02 - Note.md");
   });
-  it("writes template-style properties and the text", () => {
-    expect(buildQuickNote("Idea", "Start.", today).content).toBe("---\ncreated: 2026-11-02T09:30:00\ntags:\ncategory:\n---\nStart.\n");
+  it("files it under the clipboard category", () => {
+    expect(buildQuickNote("Idea", "Start.", today, o).content).toBe('---\ncreated: 2026-11-02T09:30:00\ntags:\ncategory:\n  - "[[Clipboard]]"\n---\nStart.\n');
   });
 });
