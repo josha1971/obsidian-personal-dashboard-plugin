@@ -193,6 +193,23 @@ export default class DashboardPlugin extends Plugin {
     return out.sort((a, b) => b.created - a.created);
   }
 
+  /** A note's first category, e.g. "Books", or undefined. */
+  categoryOf(file: TFile): string | undefined {
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined;
+    if (!fm) return undefined;
+    return [fm[this.settings.categoryProperty], fm["categories"]].flatMap((v) => (Array.isArray(v) ? v : v == null ? [] : [v])).map(linkTarget).find(Boolean);
+  }
+
+  /** The files edited most recently: notes, canvases and bases. Sealed letters are left out. */
+  getRecentlyModified(limit: number): TFile[] {
+    const sealed = this.sealedPaths();
+    return this.app.vault
+      .getFiles()
+      .filter((f) => ["md", "canvas", "base"].includes(f.extension) && !sealed.has(f.path))
+      .sort((a, b) => b.stat.mtime - a.stat.mtime)
+      .slice(0, limit);
+  }
+
   /** Words saved from Write on a given day (YYYY-MM-DD). */
   getWordsOn(date: string): number {
     return notesInCategory(this.app, this.settings, this.settings.writeCategory)

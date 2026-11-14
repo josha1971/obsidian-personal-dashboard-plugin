@@ -98,3 +98,15 @@ export function addMonths(d: Date, n: number): Date {
   const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
   return new Date(target.getFullYear(), target.getMonth(), Math.min(d.getDate(), last));
 }
+
+/** "just now", "5 min ago", "3 hours ago", "Yesterday", "4 days ago", or a date like "12 Mar". */
+export function timeAgo(ms: number, now: Date = new Date()): string {
+  const mins = Math.floor((now.getTime() - ms) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  const days = daysBetween(new Date(ms), now);
+  if (days === 0) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+  if (days === 1) return "Yesterday";
+  return friendlyDate(isoDate(new Date(ms)), now);
+}

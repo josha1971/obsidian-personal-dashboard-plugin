@@ -264,3 +264,15 @@ describe("quick note", () => {
     expect(buildQuickNote("Idea", "Start.", today, o).content).toBe('---\ncreated: 2026-11-02T09:30:00\ntags:\ncategory:\n  - "[[Clipboard]]"\n---\nStart.\n');
   });
 });
+
+import { timeAgo } from "../src/dates";
+describe("timeAgo", () => {
+  const now = new Date(2026, 10, 14, 15, 0);
+  it("describes how long ago", () => {
+    expect(timeAgo(now.getTime() - 20000, now)).toBe("just now");
+    expect(timeAgo(now.getTime() - 5 * 60000, now)).toBe("5 min ago");
+    expect(timeAgo(new Date(2026, 10, 14, 12, 0).getTime(), now)).toBe("3 hours ago");
+    expect(timeAgo(new Date(2026, 10, 13, 20, 0).getTime(), now)).toBe("Yesterday");
+    expect(timeAgo(new Date(2026, 10, 10, 9, 0).getTime(), now)).toBe("4 days ago");
+  });
+});

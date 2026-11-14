@@ -6,7 +6,7 @@ A navigation bar on every page moves between them in the same tab. **Capture** a
 
 | Page | What it does |
 | --- | --- |
-| **Home** | Capture box, a New note box, today's rhythm, **Favorites**, **Review Clipboard** (new notes waiting for a proper category), recent logs, a letter from past you when one arrives, and a few notes from the garden. Sections can be switched off in settings. |
+| **Home** | Capture box, a New note box, today's rhythm, **Favorites**, **Review Clipboard** (new notes waiting for a proper category), the last 10 files modified, a letter from past you when one arrives, and a few notes from the garden. Sections can be switched off in settings. |
 | **Write** | Freewrite with a word goal, prompts drawn from your own notes, and your unfinished drafts (`status: draft`). The draft you're typing survives a restart. |
 | **Tasks** | Every `- [ ]` in the vault. Filter by status, due date, priority, tag, or any property of the note it lives in. Tick off with Undo. |
 | **Search** | Notes, inbox lines and tasks together. |

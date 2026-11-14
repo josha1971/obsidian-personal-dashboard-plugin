@@ -33,6 +33,7 @@ function makeApp() {
     files,
     opened: [] as string[],
     vault: {
+      getFiles: () => [...files.values()].map((x) => x.file),
       getMarkdownFiles: () => [...files.values()].map((x) => x.file).filter((f) => f.extension === "md"),
       getAbstractFileByPath: (p: string) => files.get(p)?.file ?? null,
       getFileByPath: (p: string) => files.get(p)?.file ?? null,
@@ -111,7 +112,7 @@ describe("plugin smoke test", () => {
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
     const titles = [...v.contentEl.querySelectorAll(".pd-card-title")].map((e: Element) => e.textContent);
     expect(titles).toContain("Favorites");
-    expect(titles.indexOf("Favorites")).toBeLessThan(titles.indexOf("Recent logs"));
+    expect(titles.indexOf("Favorites")).toBeLessThan(titles.indexOf("Recently modified"));
     const text = v.contentEl.textContent!;
     expect(text).toContain("From past you");
     expect(text).toContain("Dear future me");
@@ -137,6 +138,19 @@ describe("plugin smoke test", () => {
     expect(ctx.files.get(key)!.content).toMatch(/^---\ncreated: .*\ntags:\ncategory:\n  - "\[\[Clipboard\]\]"\n---\n/);
     expect(ctx.app.opened).toContain(key);
     expect(title.value).toBe("");
+  });
+
+  it("Recently modified shows the last 10 files edited, newest first", async () => {
+    ctx.files.get("Dune.md")!.file.stat.mtime = Date.now() + 5000;
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    const card = [...v.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.querySelector(".pd-card-title")?.textContent === "Recently modified") as HTMLElement;
+    expect(card).toBeTruthy();
+    const names = [...card.querySelectorAll(".pd-logrow-name")].map((e) => e.textContent);
+    expect(names).toHaveLength(10);
+    expect(names[0]).toBe("Dune");
+    expect(names).not.toContain("Sealed letter");
+    expect(names).not.toContain("Old idea");
+    expect(v.contentEl.textContent).not.toContain("Recent logs");
   });
 
   it("Review Clipboard lists clipboard notes and empty-category notes, newest first", async () => {

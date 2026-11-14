@@ -2,8 +2,8 @@ import { Notice, WorkspaceLeaf, setTooltip } from "obsidian";
 import type DashboardPlugin from "../main";
 import { DashView } from "./base";
 import { VIEW_HOME } from "../constants";
-import { daysBetween, friendlyDate, isoDate, isoWeek, parseISODate, startOfDay } from "../dates";
-import { LogEntry, readInbox } from "../store";
+import { daysBetween, friendlyDate, isoDate, isoWeek, parseISODate, startOfDay, timeAgo } from "../dates";
+import { readInbox } from "../store";
 import { NewNoteDraft, chip, iconButton, renderCaptureBox, renderNewNoteBox, sectionCard, starButton } from "../ui";
 import { letterExcerpt } from "./lookbackView";
 import { ago } from "./gardenView";
@@ -25,7 +25,6 @@ export class HomeView extends DashView {
   protected async render(isCurrent: () => boolean): Promise<void> {
     const s = this.plugin.settings;
     const [tasks, inbox] = await Promise.all([this.plugin.getTasks(), readInbox(this.app, s)]);
-    const logs = this.plugin.getLogs();
     const today = startOfDay(new Date());
     const todayIso = isoDate(today);
 
@@ -56,8 +55,6 @@ export class HomeView extends DashView {
     const open = tasks.filter((t) => t.info.state === "open");
     const overdue = open.filter((t) => t.info.due && daysBetween(today, parseISODate(t.info.due) ?? today) < 0);
     const doneToday = tasks.filter((t) => t.info.state === "done" && t.info.doneDate === todayIso).length;
-    const weekAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
-    const loggedThisWeek = logs.filter((l) => (parseISODate(l.date) ?? 0) >= weekAgo);
 
     // A letter from past you
     if (arrived.length) {
@@ -94,12 +91,22 @@ export class HomeView extends DashView {
     // Review Clipboard: new notes waiting for a proper category
     if (this.shown("clipboard")) this.renderClipboard(el, today);
 
-    // Recent logs
+    // The last 10 files edited
     if (this.shown("recentLogs")) {
-      const recent = [...logs].sort((a, b) => b.date.localeCompare(a.date) || b.file.stat.ctime - a.file.stat.ctime).slice(0, 6);
-      const rl = sectionCard(el, "Recent logs", recent.length ? "latest first" : "", "pd-tone-green");
-      if (!recent.length) rl.body.createDiv({ cls: "pd-empty", text: "Nothing logged yet. Use Log to add a book, film, meal, drink or thought." });
-      for (const l of recent) this.renderLogRow(rl.body, l, today);
+      const recent = this.plugin.getRecentlyModified(10);
+      const rl = sectionCard(el, "Recently modified", recent.length ? `last ${recent.length}` : "", "pd-tone-green");
+      if (!recent.length) rl.body.createDiv({ cls: "pd-empty", text: "No notes yet." });
+      for (const f of recent) {
+        const row = rl.body.createDiv({ cls: "pd-logrow" });
+        const name = row.createSpan({ text: f.basename, cls: "pd-logrow-name" });
+        name.addEventListener("click", () => void this.plugin.openFile(f));
+        setTooltip(name, `Open ${f.path} in a new tab`, { delay: 400 });
+        const cat = this.plugin.categoryOf(f);
+        if (cat) chip(row, cat, "is-type");
+        else if (f.extension !== "md") chip(row, f.extension === "canvas" ? "Canvas" : "Base", "is-type");
+        if (f.parent && !f.parent.isRoot()) row.createSpan({ text: f.parent.name, cls: "pd-muted pd-logrow-detail" });
+        row.createSpan({ text: timeAgo(f.stat.mtime), cls: "pd-muted pd-logrow-date" });
+      }
     }
 
     // From the garden
@@ -171,16 +178,5 @@ export class HomeView extends DashView {
     b.createDiv({ cls: "pd-stat-label", text: label });
     setTooltip(b, tip, { delay: 300 });
     b.addEventListener("click", onClick);
-  }
-
-  private renderLogRow(parent: HTMLElement, l: LogEntry, today: Date): void {
-    const row = parent.createDiv({ cls: "pd-logrow" });
-    chip(row, l.type.label, "is-type");
-    const name = row.createSpan({ text: l.file.basename, cls: "pd-logrow-name" });
-    name.addEventListener("click", () => void this.plugin.openFile(l.file));
-    setTooltip(name, "Open this note", { delay: 400 });
-    if (l.detail) row.createSpan({ text: l.detail, cls: "pd-muted pd-logrow-detail" });
-    if (l.rating !== undefined) chip(row, `${l.rating}/10`, "is-rating");
-    row.createSpan({ text: friendlyDate(l.date, today), cls: "pd-muted pd-logrow-date" });
   }
 }

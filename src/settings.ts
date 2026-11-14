@@ -66,7 +66,7 @@ export const HOME_SECTIONS: [string, string][] = [
   ["stats", "At a glance numbers"],
   ["favorites", "Favorites"],
   ["clipboard", "Review Clipboard"],
-  ["recentLogs", "Recent logs"],
+  ["recentLogs", "Recently modified"],
   ["garden", "From the garden"],
 ];
 
