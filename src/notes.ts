@@ -1,4 +1,4 @@
-import { isoDate, isoDateTime } from "./dates";
+import { isoDate, isoDateTime, pad } from "./dates";
 import { safeFileName, yamlString } from "./logs";
 
 /** A value written as is (for dates, so they are not quoted). */
@@ -44,4 +44,13 @@ export function buildQuickNote(title: string, body: string, now: Date, opts: { c
   const base = safeFileName(title) || "Note";
   const content = buildNoteText([["created", raw(isoDateTime(now))], ["tags", raw("")], [opts.categoryProperty, [wikilink(opts.category)]]], body);
   return { filename: `${isoDate(now)} - ${base}.md`, content };
+}
+
+/**
+ * A quick thought: the note is named with the date and time to the minute
+ * ("2026-11-17 1430") and filed under its own category.
+ */
+export function buildQuickThought(text: string, now: Date, opts: { category: string; categoryProperty: string }): { filename: string; content: string } {
+  const content = buildNoteText([["created", raw(isoDateTime(now))], ["tags", raw("")], [opts.categoryProperty, [wikilink(opts.category)]]], text);
+  return { filename: `${isoDate(now)} ${pad(now.getHours())}${pad(now.getMinutes())}.md`, content };
 }

@@ -247,3 +247,7 @@
 
 /* Review Clipboard: a long list stays inside its card */
 .pd-scroll { max-height: 420px; overflow-y: auto; }
+
+/* Quick thought popup */
+.pd-thought-text { width: 100%; min-height: 150px; resize: vertical; }
+.pd-modal .pd-newnote-foot { margin-top: 10px; }

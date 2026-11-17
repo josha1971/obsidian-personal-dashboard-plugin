@@ -1,4 +1,4 @@
-import { Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf, debounce } from "obsidian";
+import { Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf, debounce, normalizePath } from "obsidian";
 import { DEFAULT_SETTINGS, DashboardSettings, DashboardSettingTab } from "./settings";
 import { NAV, PAGE_TYPES, PageId, VIEW_CHOOSE, VIEW_GARDEN, VIEW_HOME, VIEW_LIBRARY, VIEW_LOGS, VIEW_LOOKBACK, VIEW_OVERVIEW, VIEW_REVIEW, VIEW_SEARCH, VIEW_TASKS, VIEW_WRITE } from "./constants";
 import { HomeView } from "./views/homeView";
@@ -12,11 +12,11 @@ import { LibraryView, LibraryState } from "./views/libraryView";
 import { OverviewView } from "./views/overviewView";
 import { TasksView } from "./views/tasksView";
 import { LogsView } from "./views/logsView";
-import { CaptureModal, LogModal } from "./modals";
+import { CaptureModal, LogModal, QuickThoughtModal } from "./modals";
 import { CatNote, FavoriteItem, LogEntry, TaskItem, appendLine, collectFavorites, collectLogs, isExcluded, linkTarget, noteDate, notesInCategory, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
 import { CaptureMode, describeCapture, formatCaptureLine, parseCapture } from "./parser";
 import { toggleLine } from "./tasks";
-import { buildQuickNote } from "./notes";
+import { buildQuickNote, buildQuickThought } from "./notes";
 import { LogType } from "./logs";
 import { undoNotice } from "./ui";
 import { isFlagged } from "./favorites";
@@ -66,6 +66,8 @@ export default class DashboardPlugin extends Plugin {
         return true;
       },
     });
+    this.addCommand({ id: "add-quick-thought", name: "Add Quick Thought", callback: () => this.openQuickThoughtModal() });
+    this.addCommand({ id: "see-quick-thoughts", name: "See all Quick Thoughts", callback: () => void this.openAllQuickThoughts() });
     this.addCommand({ id: "quick-capture", name: "Quick capture", callback: () => this.openCaptureModal() });
     this.addCommand({ id: "log-something", name: "Log something", callback: () => this.openLogModal() });
     this.addCommand({ id: "log-thought", name: "Log a thought", callback: () => this.openLogModal("thought") });
@@ -287,6 +289,31 @@ export default class DashboardPlugin extends Plugin {
     new CaptureModal(this.app, this).open();
   }
 
+  openQuickThoughtModal(): void {
+    new QuickThoughtModal(this.app, this).open();
+  }
+
+  /** Saves a quick thought in the Quick Thoughts folder. Returns true if it was saved. */
+  async saveQuickThought(text: string): Promise<boolean> {
+    if (!text.trim()) return false;
+    const n = buildQuickThought(text, new Date(), { category: this.settings.quickThoughtCategory, categoryProperty: this.settings.categoryProperty });
+    try {
+      await this.createNote(n.filename, n.content, this.settings.quickThoughtFolder);
+      return true;
+    } catch (e) {
+      new Notice(`Could not save the thought: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
+  /** Opens "All Quick Thoughts" (the note you keep a Bases table in) in a new tab. */
+  async openAllQuickThoughts(): Promise<void> {
+    const path = normalizePath(`${this.settings.quickThoughtFolder}/All Quick Thoughts.md`);
+    const f = this.app.vault.getAbstractFileByPath(path);
+    if (f instanceof TFile) await this.openFile(f);
+    else new Notice(`Couldn't find "${path}". Create a note with that name and it will open from here.`);
+  }
+
   openLogModal(typeId?: string): void {
     new LogModal(this.app, this, typeId).open();
   }
@@ -421,8 +448,8 @@ export default class DashboardPlugin extends Plugin {
   }
 
   /** Creates a new note in the notes folder, with Undo. Never touches an existing note. */
-  async createNote(filename: string, content: string): Promise<TFile> {
-    const file = await createUniqueNote(this.app, this.settings.logsFolder, filename, content);
+  async createNote(filename: string, content: string, folder: string = this.settings.logsFolder): Promise<TFile> {
+    const file = await createUniqueNote(this.app, folder, filename, content);
     undoNotice(`Saved ${file.basename}.`, async () => {
       await this.app.fileManager.trashFile(file);
     });

@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { Notice, TFile, installDomHelpers } from "./obsidian-mock";
 import DashboardPlugin from "../src/main";
 import { addDays, isoDate } from "../src/dates";
-import { LogModal } from "../src/modals";
+import { LogModal, QuickThoughtModal } from "../src/modals";
 import { DecisionModal, LetterModal } from "../src/lookbackModals";
 
 installDomHelpers();
@@ -163,6 +163,36 @@ describe("plugin smoke test", () => {
     expect(names).not.toContain("Books");
     expect(card.textContent).toContain("No category");
     expect(card.textContent).toContain("Clipboard");
+  });
+
+  it("Home has Add Quick Thought and See all Quick Thoughts right after Open inbox", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    const labels = [...v.contentEl.querySelectorAll(".pd-actions .pd-btn")].map((b: Element) => b.textContent);
+    const i = labels.indexOf("Open inbox");
+    expect(labels.slice(i, i + 3)).toEqual(["Open inbox", "Add Quick Thought", "See all Quick Thoughts"]);
+  });
+
+  it("Add Quick Thought saves a minute-stamped note in the Quick Thoughts folder", async () => {
+    const m = new QuickThoughtModal(ctx.app, ctx.plugin);
+    m.open();
+    const area = m.contentEl.querySelector("textarea") as HTMLTextAreaElement;
+    area.value = "Ask Sam about the stall permit."; area.dispatchEvent(new Event("input"));
+    expect(m.contentEl.textContent).toMatch(/Quick Thoughts\/\d{4}-\d{2}-\d{2} \d{4}\.md/);
+    (m.contentEl.querySelector(".mod-cta") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    const key = [...ctx.files.keys()].find((k) => /^Quick Thoughts\/\d{4}-\d{2}-\d{2} \d{4}\.md$/.test(k))!;
+    expect(key).toBeTruthy();
+    expect(ctx.files.get(key)!.content).toMatch(/^---\ncreated: .*\ntags:\ncategory:\n  - "\[\[Quick Thought\]\]"\n---\nAsk Sam/);
+    expect(ctx.app.opened).not.toContain(key);
+  });
+
+  it("See all Quick Thoughts opens the note, or says it is missing", async () => {
+    Notice.messages.length = 0;
+    await ctx.plugin.openAllQuickThoughts();
+    expect(Notice.messages.join(" ")).toContain("Quick Thoughts/All Quick Thoughts.md");
+    ctx.add("Quick Thoughts/All Quick Thoughts.md", "base here", { });
+    await ctx.plugin.openAllQuickThoughts();
+    expect(ctx.app.opened).toContain("Quick Thoughts/All Quick Thoughts.md");
   });
 
   it("Library groups by category to start with and remembers the choice", async () => {

@@ -276,3 +276,12 @@ describe("timeAgo", () => {
     expect(timeAgo(new Date(2026, 10, 10, 9, 0).getTime(), now)).toBe("4 days ago");
   });
 });
+
+import { buildQuickThought } from "../src/notes";
+describe("quick thought", () => {
+  it("is named with the date and time to the minute and filed under its category", () => {
+    const n = buildQuickThought("Call the dentist.", new Date(2026, 10, 17, 14, 5), { category: "Quick Thought", categoryProperty: "category" });
+    expect(n.filename).toBe("2026-11-17 1405.md");
+    expect(n.content).toBe('---\ncreated: 2026-11-17T14:05:00\ntags:\ncategory:\n  - "[[Quick Thought]]"\n---\nCall the dentist.\n');
+  });
+});

@@ -4,6 +4,42 @@ import { LogEntry, asList, linkTarget } from "./store";
 import { LogField, LogType, LogValues, RATING_LABELS, buildLogNote } from "./logs";
 import { isoDate, addDays } from "./dates";
 import { renderCaptureBox } from "./ui";
+import { buildQuickThought } from "./notes";
+
+/** Just a text box. Saves a note named with the date and time in the Quick Thoughts folder. */
+export class QuickThoughtModal extends Modal {
+  private text = "";
+  constructor(app: App, private plugin: DashboardPlugin) {
+    super(app);
+  }
+  onOpen(): void {
+    this.modalEl.addClass("pd-modal");
+    this.titleEl.setText("Quick thought");
+    const s = this.plugin.settings;
+    const area = this.contentEl.createEl("textarea", { cls: "pd-input pd-textarea pd-thought-text", attr: { placeholder: "What's on your mind?" } });
+    area.rows = 7;
+    const foot = this.contentEl.createDiv({ cls: "pd-newnote-foot" });
+    const hint = foot.createSpan({ cls: "pd-muted pd-grow pd-newnote-hint" });
+    const save = foot.createEl("button", { text: "Save", cls: "pd-btn mod-cta" });
+    setTooltip(save, "Saves a new note in the Quick Thoughts folder (Ctrl/Cmd+Enter)", { delay: 300 });
+    const paint = () => {
+      const n = buildQuickThought(this.text, new Date(), { category: s.quickThoughtCategory, categoryProperty: s.categoryProperty });
+      hint.setText(`Will be saved as ${s.quickThoughtFolder}/${n.filename}`);
+    };
+    const submit = async () => {
+      if (!this.text.trim()) { new Notice("Write something first"); return; }
+      if (await this.plugin.saveQuickThought(this.text)) this.close();
+    };
+    area.addEventListener("input", () => { this.text = area.value; paint(); });
+    area.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); void submit(); } });
+    save.addEventListener("click", () => void submit());
+    paint();
+    window.setTimeout(() => area.focus(), 30);
+  }
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
 
 export class CaptureModal extends Modal {
   constructor(app: App, private plugin: DashboardPlugin) {

@@ -25,6 +25,9 @@ export interface DashboardSettings {
   writeCategory: string;
   /** Notes made from Home are filed here, and Home lists them (plus notes with an empty category) for review. */
   clipboardCategory: string;
+  /** Quick thoughts are saved in this folder, filed under this category. */
+  quickThoughtFolder: string;
+  quickThoughtCategory: string;
   /** Daily words goal for Write. */
   writeGoal: number;
   /** Garden brings back notes not touched for this many days. */
@@ -55,6 +58,8 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   letterCategory: "Letters",
   writeCategory: "Writing",
   clipboardCategory: "Clipboard",
+  quickThoughtFolder: "Quick Thoughts",
+  quickThoughtCategory: "Quick Thought",
   writeGoal: 300,
   gardenDays: 120,
   gardenCount: 5,
@@ -131,6 +136,14 @@ export class DashboardSettingTab extends PluginSettingTab {
     text("Letter category", "Letters to future you use this category.", "letterCategory");
     text("Writing category", "Freewrite notes from the Write page use this category.", "writeCategory");
     text("Clipboard category", "Notes made from the New note box on Home are filed here. Review Clipboard also lists notes with an empty category.", "clipboardCategory");
+    new Setting(containerEl)
+      .setName("Quick Thoughts folder")
+      .setDesc("Add Quick Thought saves notes here. See all Quick Thoughts opens the note called All Quick Thoughts inside it.")
+      .addText((t) => t.setValue(s.quickThoughtFolder).onChange(async (v) => { s.quickThoughtFolder = v.trim().replace(/^\/+|\/+$/g, "") || DEFAULT_SETTINGS.quickThoughtFolder; await save(); }));
+    new Setting(containerEl)
+      .setName("Quick Thought category")
+      .setDesc("The category written on each quick thought, e.g. [[Quick Thought]].")
+      .addText((t) => t.setValue(s.quickThoughtCategory).onChange(async (v) => { s.quickThoughtCategory = v.trim() || DEFAULT_SETTINGS.quickThoughtCategory; await save(); }));
     const num = (name: string, desc: string, key: "writeGoal" | "gardenDays" | "gardenCount", min: number) =>
       new Setting(containerEl).setName(name).setDesc(desc).addText((t) => t.setValue(String(s[key])).onChange(async (v) => { s[key] = Math.max(min, parseInt(v) || DEFAULT_SETTINGS[key]); await save(); }));
     num("Daily word goal", "Shown on Write and Home.", "writeGoal", 1);

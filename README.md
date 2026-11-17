@@ -19,6 +19,8 @@ A navigation bar on every page moves between them in the same tab. **Capture** a
 
 **Quick capture** turns `call Sam ~15m !low @fri` into a task (15 minutes, low priority, due Friday) and shows how it was read before saving. New lines go to the top of one inbox note, so the mobile widget can open it.
 
+**Quick Thoughts**: *Add Quick Thought* on Home (or the command) opens a box that saves a note named with the date and time to the minute (`2026-11-17 1430`) in the `Quick Thoughts` folder, filed under `[[Quick Thought]]`. *See all Quick Thoughts* opens `Quick Thoughts/All Quick Thoughts` in a new tab, a good place for a Bases table of that category. Folder and category are settings.
+
 **Quick Log** covers books, films, TV, music, restaurants and bars, cooked food, drinks made and thoughts. Each saves a new note with `category: ["[[Books]]"]` etc. and shows the exact note first. Log types are JSON in settings, so you can add or rename types and fields.
 
 **Favorites**: toggle from the command palette, a note's menu, or the star. Notes get `favorite: true`. Canvases and other non-note files are remembered in the plugin settings.
