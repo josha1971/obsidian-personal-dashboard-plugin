@@ -133,10 +133,17 @@ export default class DashboardPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const saved = (await this.loadData()) as Partial<DashboardSettings> | null;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
-    if (this.settings.libraryState) Object.assign(this.libraryState, this.settings.libraryState);
     if (!Array.isArray(this.settings.logTypes) || !this.settings.logTypes.length) {
       this.settings.logTypes = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.logTypes));
     }
+    // One-time: stop suggesting earlier "Recipe from" values (they are long links). Runs once, so you can turn it back on in the log types.
+    if (!this.settings.migrations?.includes("cooked-source-no-suggest")) {
+      const src = this.settings.logTypes.find((t) => t.id === "cooked")?.fields.find((f) => f.key === "source");
+      if (src) delete src.suggest;
+      this.settings.migrations = [...(this.settings.migrations ?? []), "cooked-source-no-suggest"];
+      if (saved) await this.saveData(this.settings);
+    }
+    if (this.settings.libraryState) Object.assign(this.libraryState, this.settings.libraryState);
   }
 
   /** Remembers how the Library was set up. Does not refresh anything. */

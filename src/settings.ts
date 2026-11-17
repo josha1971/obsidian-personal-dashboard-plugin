@@ -37,6 +37,8 @@ export interface DashboardSettings {
   homeHidden: string[];
   /** The Library's last layout, category and grouping, so it opens the way you left it. */
   libraryState?: { category: string; groupKey: string; dateKey: string; layout: "list" | "board" | "calendar" };
+  /** One-time changes already applied to saved settings. */
+  migrations?: string[];
   logTypes: LogType[];
 }
 

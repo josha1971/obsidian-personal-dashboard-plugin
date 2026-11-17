@@ -291,6 +291,27 @@ describe("plugin smoke test", () => {
     expect(ctx.plugin.gardenToday(10).picks.map((f) => f.basename)).not.toContain("Old idea");
   });
 
+  it("stops suggesting earlier recipe sources, once, for already-saved settings", async () => {
+    const { app } = makeApp();
+    const plugin = new DashboardPlugin(app, {} as any);
+    const old = JSON.parse(JSON.stringify(ctx.plugin.settings.logTypes));
+    old.find((t: any) => t.id === "cooked").fields.find((f: any) => f.key === "source").suggest = true;
+    (plugin as any).store = { logTypes: old };
+    await plugin.onload();
+    const src = () => plugin.settings.logTypes.find((t) => t.id === "cooked")!.fields.find((f) => f.key === "source")!;
+    expect(src().suggest).toBeFalsy();
+    expect(plugin.settings.migrations).toContain("cooked-source-no-suggest");
+    // Turning it back on sticks: the change does not run again.
+    src().suggest = true;
+    await plugin.saveSettings();
+    const again = new DashboardPlugin(app, {} as any);
+    (again as any).store = JSON.parse(JSON.stringify(plugin.settings));
+    await again.onload();
+    expect(again.settings.logTypes.find((t) => t.id === "cooked")!.fields.find((f) => f.key === "source")!.suggest).toBe(true);
+    // Other fields keep their suggestions.
+    expect(plugin.settings.logTypes.find((t) => t.id === "place")!.fields.find((f) => f.key === "area")!.suggest).toBe(true);
+  });
+
   it("no unexpected error notices were shown", () => {
     const bad = Notice.messages.filter((m) => /could not|error/i.test(m));
     expect(bad).toEqual([]);

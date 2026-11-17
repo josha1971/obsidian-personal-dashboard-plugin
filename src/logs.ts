@@ -99,7 +99,7 @@ export const DEFAULT_LOG_TYPES: LogType[] = [
   {
     id: "cooked", label: "Cooked", icon: "cooking-pot", category: "Recipes", nameLabel: "Dish",
     fields: [
-      { key: "source", label: "Recipe from", kind: "text", suggest: true, hint: "Book, site or 'made it up'" },
+      { key: "source", label: "Recipe from", kind: "text", hint: "Book, site or 'made it up'" },
       { key: "servings", label: "Servings", kind: "number" },
       RATING, WHY, WITH, WHEN,
     ],
