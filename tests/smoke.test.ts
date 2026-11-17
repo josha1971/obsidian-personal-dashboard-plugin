@@ -166,11 +166,10 @@ describe("plugin smoke test", () => {
     expect(card.textContent).toContain("Clipboard");
   });
 
-  it("Home has Add Quick Thought and See all Quick Thoughts right after Open inbox", async () => {
+  it("Home puts Add Quick Thought and See all Quick Thoughts first in the button row", async () => {
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
     const labels = [...v.contentEl.querySelectorAll(".pd-actions .pd-btn")].map((b: Element) => b.textContent);
-    const i = labels.indexOf("Open inbox");
-    expect(labels.slice(i, i + 3)).toEqual(["Open inbox", "Add Quick Thought", "See all Quick Thoughts"]);
+    expect(labels.slice(0, 4)).toEqual(["Add Quick Thought", "See all Quick Thoughts", "Journal", "Weekly review"]);
   });
 
   it("Add Quick Thought saves a minute-stamped note in the Quick Thoughts folder", async () => {

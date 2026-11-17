@@ -46,13 +46,13 @@ export class HomeView extends DashView {
 
     // Shortcuts
     const bar = el.createDiv({ cls: "pd-actions" });
+    iconButton(bar, "message-square-plus", "Add Quick Thought", () => this.plugin.openQuickThoughtModal());
+    iconButton(bar, "list", "See all Quick Thoughts", () => void this.plugin.openAllQuickThoughts());
     iconButton(bar, "book-marked", "Journal", () => this.openJournal());
     iconButton(bar, "calendar-check", "Weekly review", () => void this.plugin.navigate(this.leaf, "review"));
     iconButton(bar, "mail", "Write to future me", () => this.plugin.openLetterModal());
     iconButton(bar, "flag", "Log a decision", () => this.plugin.openDecisionModal());
     iconButton(bar, "inbox", "Open inbox", () => void this.plugin.openInbox());
-    iconButton(bar, "message-square-plus", "Add Quick Thought", () => this.plugin.openQuickThoughtModal());
-    iconButton(bar, "list", "See all Quick Thoughts", () => void this.plugin.openAllQuickThoughts());
 
     const open = tasks.filter((t) => t.info.state === "open");
     const overdue = open.filter((t) => t.info.due && daysBetween(today, parseISODate(t.info.due) ?? today) < 0);
