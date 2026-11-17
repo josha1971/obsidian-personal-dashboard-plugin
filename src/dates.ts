@@ -13,6 +13,16 @@ export function isoDateTime(d: Date): string {
   return `${isoDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+/** 12-hour time for file names, where a colon is not allowed: "2.05 PM". */
+export function clockName(d: Date): string {
+  return `${d.getHours() % 12 || 12}.${pad(d.getMinutes())} ${d.getHours() < 12 ? "AM" : "PM"}`;
+}
+
+/** 12-hour time for text: "2:05 PM". */
+export function clockText(d: Date): string {
+  return clockName(d).replace(".", ":");
+}
+
 export function parseISODate(s: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (!m) return null;

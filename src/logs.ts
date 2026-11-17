@@ -1,4 +1,4 @@
-import { isoDate, isoDateTime, pad } from "./dates";
+import { clockName, isoDate, isoDateTime } from "./dates";
 
 export type FieldKind = "text" | "longtext" | "number" | "rating" | "date" | "choice" | "multi";
 
@@ -25,7 +25,7 @@ export interface LogType {
   /** Name of the category note this log belongs to, e.g. "Books" saves category: [[Books]]. */
   category: string;
   nameLabel: string;
-  /** "timestamp" adds the date and time after the title you type ("Idea 2026-11-02 1432"). The title is optional. */
+  /** "timestamp" adds the date and time after the title you type ("Idea 2026-11-02 2.32 PM"). The title is optional. */
   titleMode?: "name" | "timestamp";
   titlePrefix?: string;
   tags?: string[];
@@ -163,7 +163,7 @@ export function titleFor(type: LogType, name: string, now: Date): string {
   const base = safeFileName(name);
   if (type.titleMode === "timestamp") {
     // Whatever you type, with the date and time added: "Pour-over ratio 2026-11-02 1432".
-    return `${base || type.titlePrefix || type.label} ${isoDate(now)} ${pad(now.getHours())}${pad(now.getMinutes())}`;
+    return `${base || type.titlePrefix || type.label} ${isoDate(now)} ${clockName(now)}`;
   }
   return base || `${type.label} ${isoDate(now)}`;
 }

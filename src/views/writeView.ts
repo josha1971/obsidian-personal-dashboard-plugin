@@ -2,7 +2,7 @@ import { Notice, TFile, WorkspaceLeaf, setTooltip } from "obsidian";
 import type DashboardPlugin from "../main";
 import { DashView } from "./base";
 import { VIEW_WRITE } from "../constants";
-import { isoDate, pad, friendlyDate } from "../dates";
+import { clockName, isoDate, pad, friendlyDate } from "../dates";
 import { buildNoteText, raw, wikilink, wordCount } from "../notes";
 import { safeFileName } from "../logs";
 import { isExcluded } from "../store";
@@ -91,7 +91,7 @@ export class WriteView extends DashView {
       if (!this.text.trim()) { new Notice("Write something first"); return; }
       const now = new Date();
       const base = safeFileName(this.title) || "Freewrite";
-      const stamp = `${isoDate(now)} ${pad(now.getHours())}${pad(now.getMinutes())}`;
+      const stamp = `${isoDate(now)} ${clockName(now)}`;
       const content = buildNoteText(
         [
           ["created", raw(`${isoDate(now)}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`)],

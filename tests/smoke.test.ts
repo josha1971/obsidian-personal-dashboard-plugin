@@ -4,6 +4,7 @@ import { Notice, TFile, installDomHelpers } from "./obsidian-mock";
 import DashboardPlugin from "../src/main";
 import { addDays, isoDate } from "../src/dates";
 import { LogModal, QuickThoughtModal } from "../src/modals";
+import { readInbox } from "../src/store";
 import { DecisionModal, LetterModal } from "../src/lookbackModals";
 
 installDomHelpers();
@@ -177,10 +178,10 @@ describe("plugin smoke test", () => {
     m.open();
     const area = m.contentEl.querySelector("textarea") as HTMLTextAreaElement;
     area.value = "Ask Sam about the stall permit."; area.dispatchEvent(new Event("input"));
-    expect(m.contentEl.textContent).toMatch(/Quick Thoughts\/\d{4}-\d{2}-\d{2} \d{4}\.md/);
+    expect(m.contentEl.textContent).toMatch(/Quick Thoughts\/\d{4}-\d{2}-\d{2} \d{1,2}\.\d{2} [AP]M\.md/);
     (m.contentEl.querySelector(".mod-cta") as HTMLElement).click();
     await new Promise((r) => setTimeout(r, 20));
-    const key = [...ctx.files.keys()].find((k) => /^Quick Thoughts\/\d{4}-\d{2}-\d{2} \d{4}\.md$/.test(k))!;
+    const key = [...ctx.files.keys()].find((k) => /^Quick Thoughts\/\d{4}-\d{2}-\d{2} \d{1,2}\.\d{2} [AP]M\.md$/.test(k))!;
     expect(key).toBeTruthy();
     expect(ctx.files.get(key)!.content).toMatch(/^---\ncreated: .*\ntags:\ncategory:\n  - "\[\[Quick Thought\]\]"\n---\nAsk Sam/);
     expect(ctx.app.opened).not.toContain(key);
@@ -242,6 +243,15 @@ describe("plugin smoke test", () => {
     expect(ctx.plugin.sealedPaths().has("Letter to future me.md")).toBe(false);
   });
 
+  it("reads inbox lines with old 24-hour stamps and new 12-hour ones", async () => {
+    ctx.files.get("Inbox.md")!.content += "- 2026-11-10 2:32 PM new style\n- 2026-11-11 11:05 am lower case\n";
+    const items = await readInbox(ctx.app, ctx.plugin.settings);
+    const byText = Object.fromEntries(items.map((i) => [i.text, i.added]));
+    expect(byText["old thought"]).toBe("2026-10-01");
+    expect(byText["new style"]).toBe("2026-11-10");
+    expect(byText["lower case"]).toBe("2026-11-11");
+  });
+
   it("captures to the top of the inbox with Undo text", async () => {
     expect(await ctx.plugin.capture("call Sam ~15m !low @fri", "auto")).toBe(true);
     const inbox = ctx.files.get("Inbox.md")!.content;
@@ -276,7 +286,7 @@ describe("plugin smoke test", () => {
     expect(m.contentEl.querySelector(".pd-preview")!.textContent).toContain("Try 1:16");
     (m.contentEl.querySelector(".pd-footer .mod-cta") as HTMLElement).click();
     await new Promise((r) => setTimeout(r, 20));
-    expect([...ctx.files.keys()].some((k) => /^Pour-over ratio \d{4}-\d{2}-\d{2} \d{4}\.md$/.test(k))).toBe(true);
+    expect([...ctx.files.keys()].some((k) => /^Pour-over ratio \d{4}-\d{2}-\d{2} \d{1,2}\.\d{2} [AP]M\.md$/.test(k))).toBe(true);
   });
 
   it("logs a restaurant with a rating through the modal", async () => {

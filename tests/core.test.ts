@@ -34,7 +34,7 @@ describe("capture parser", () => {
     const p = parseCapture("what if the stall sold jam too #idea", today);
     expect(p.isTask).toBe(false);
     expect(p.tags).toEqual(["idea"]);
-    expect(formatCaptureLine(p, today)).toBe("- 2026-11-02 09:30 what if the stall sold jam too #idea");
+    expect(formatCaptureLine(p, today)).toBe("- 2026-11-02 9:30 AM what if the stall sold jam too #idea");
   });
   it("handles durations", () => {
     expect(parseDuration("1h30m")).toBe(90);
@@ -86,11 +86,11 @@ describe("log notes", () => {
   });
   it("titles thoughts by timestamp", () => {
     const thought = DEFAULT_LOG_TYPES.find((t) => t.id === "thought")!;
-    expect(buildLogNote(thought, "", {}, "idea", { now: today, categoryProperty: "category" }).filename).toBe("Thought 2026-11-02 0930.md");
+    expect(buildLogNote(thought, "", {}, "idea", { now: today, categoryProperty: "category" }).filename).toBe("Thought 2026-11-02 9.30 AM.md");
   });
   it("adds the date after a typed thought title", () => {
     const thought = DEFAULT_LOG_TYPES.find((t) => t.id === "thought")!;
-    expect(buildLogNote(thought, "Pour-over ratio", {}, "idea", { now: today, categoryProperty: "category" }).filename).toBe("Pour-over ratio 2026-11-02 0930.md");
+    expect(buildLogNote(thought, "Pour-over ratio", {}, "idea", { now: today, categoryProperty: "category" }).filename).toBe("Pour-over ratio 2026-11-02 9.30 AM.md");
   });
   it("sanitises names and quotes risky yaml", () => {
     expect(buildLogNote(place, "A/B: C?", {}, "", { now: today, categoryProperty: "category" }).filename).toBe("A B C.md");
@@ -265,7 +265,7 @@ describe("quick note", () => {
   });
 });
 
-import { timeAgo } from "../src/dates";
+import { clockName, clockText, timeAgo } from "../src/dates";
 describe("timeAgo", () => {
   const now = new Date(2026, 10, 14, 15, 0);
   it("describes how long ago", () => {
@@ -281,7 +281,16 @@ import { buildQuickThought } from "../src/notes";
 describe("quick thought", () => {
   it("is named with the date and time to the minute and filed under its category", () => {
     const n = buildQuickThought("Call the dentist.", new Date(2026, 10, 17, 14, 5), { category: "Quick Thought", categoryProperty: "category" });
-    expect(n.filename).toBe("2026-11-17 1405.md");
+    expect(n.filename).toBe("2026-11-17 2.05 PM.md");
     expect(n.content).toBe('---\ncreated: 2026-11-17T14:05:00\ntags:\ncategory:\n  - "[[Quick Thought]]"\n---\nCall the dentist.\n');
+  });
+});
+
+describe("12-hour time", () => {
+  it("formats file-name and text times", () => {
+    expect(clockName(new Date(2026, 10, 17, 14, 5))).toBe("2.05 PM");
+    expect(clockName(new Date(2026, 10, 17, 0, 7))).toBe("12.07 AM");
+    expect(clockName(new Date(2026, 10, 17, 12, 0))).toBe("12.00 PM");
+    expect(clockText(new Date(2026, 10, 17, 9, 30))).toBe("9:30 AM");
   });
 });

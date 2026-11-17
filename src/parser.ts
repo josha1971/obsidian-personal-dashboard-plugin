@@ -1,4 +1,4 @@
-import { friendlyDate, isoDate, pad, parseDateToken } from "./dates";
+import { clockText, friendlyDate, isoDate, parseDateToken } from "./dates";
 
 export type Priority = "high" | "medium" | "low";
 export type CaptureMode = "auto" | "task" | "note";
@@ -98,7 +98,7 @@ function collectTags(text: string): string[] {
 
 /** The exact line that is appended to the inbox note. */
 export function formatCaptureLine(p: ParsedCapture, now: Date): string {
-  if (!p.isTask) return `- ${isoDate(now)} ${pad(now.getHours())}:${pad(now.getMinutes())} ${p.text}`;
+  if (!p.isTask) return `- ${isoDate(now)} ${clockText(now)} ${p.text}`;
   const bits = [`- [ ] ${p.text}`];
   if (p.duration) bits.push(`~${formatDuration(p.duration)}`);
   bits.push(`➕ ${isoDate(now)}`);

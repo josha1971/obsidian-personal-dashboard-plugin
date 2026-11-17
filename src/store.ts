@@ -178,7 +178,7 @@ export async function readInbox(app: App, settings: DashboardSettings): Promise<
     }
     const note = /^\s*[-*+]\s+(?!\[.\])(.+)$/.exec(line);
     if (note) {
-      const stamp = /^(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}\s+(.*)$/.exec(note[1]);
+      const stamp = /^(\d{4}-\d{2}-\d{2})\s+\d{1,2}:\d{2}(?:\s?[AP]M)?\s+(.*)$/i.exec(note[1]);
       items.push({ text: stamp ? stamp[2] : note[1], isTask: false, added: stamp?.[1] });
     }
   }
