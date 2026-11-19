@@ -3,14 +3,14 @@ import type DashboardPlugin from "../main";
 import { DashView } from "./base";
 import { VIEW_TASKS } from "../constants";
 import { daysBetween, parseISODate, startOfDay } from "../dates";
-import { TaskItem, asList, linkTarget } from "../store";
+import { TaskItem, asList, linkTarget, taskCreatedKey } from "../store";
 import { renderTaskRow } from "../ui";
 
 type Status = "open" | "done" | "all";
 type DueFilter = "any" | "overdue" | "today" | "week" | "none";
-type Group = "due" | "note" | "priority";
+type Group = "none" | "due" | "note" | "priority";
+type Sort = "newest" | "oldest" | "due";
 
-const PRI_RANK = { high: 0, medium: 1, low: 2 } as const;
 
 export class TasksView extends DashView {
   private tasks: TaskItem[] = [];
@@ -21,7 +21,8 @@ export class TasksView extends DashView {
   private search = "";
   private propKey = "";
   private propVal = "";
-  private group: Group = "due";
+  private group: Group = "none";
+  private sort: Sort = "newest";
   private listEl?: HTMLElement;
   private summaryEl?: HTMLElement;
 
@@ -77,7 +78,8 @@ export class TasksView extends DashView {
       this.select(bar, "equals", [["", "Any value"], ...[...vals].sort().map((v): [string, string] => [v, v])], () => this.propVal, (v) => (this.propVal = v), "Pick the value to match");
     }
 
-    this.select(bar, "Group by", [["due", "Due date"], ["note", "Note"], ["priority", "Priority"]], () => this.group, (v) => (this.group = v as Group), "How to group the list");
+    this.select(bar, "Sort", [["newest", "Newest first"], ["oldest", "Oldest first"], ["due", "Due date"]], () => this.sort, (v) => (this.sort = v as Sort), "Newest and oldest go by when the checklist item was created");
+    this.select(bar, "Group by", [["none", "No grouping"], ["due", "Due date"], ["note", "Note"], ["priority", "Priority"]], () => this.group, (v) => (this.group = v as Group), "How to group the list");
 
     const search = bar.createEl("input", { type: "text", cls: "pd-input pd-search", attr: { placeholder: "Search tasks" } });
     search.value = this.search;
@@ -146,6 +148,7 @@ export class TasksView extends DashView {
   }
 
   private bucket(x: TaskItem, today: Date): string {
+    if (this.group === "none") return "All tasks";
     if (this.group === "note") return x.file.basename;
     if (this.group === "priority") return x.info.priority ? x.info.priority[0].toUpperCase() + x.info.priority.slice(1) : "No priority";
     if (!x.info.due) return "No date";
@@ -167,16 +170,13 @@ export class TasksView extends DashView {
       return;
     }
 
-    const order = (x: TaskItem) => [
-      x.info.due ?? "9999",
-      PRI_RANK[x.info.priority ?? "low"] + (x.info.priority ? 0 : 1),
-      x.file.basename,
-    ];
+    const byCreated = (a: TaskItem, b: TaskItem) =>
+      taskCreatedKey(b).localeCompare(taskCreatedKey(a)) || b.file.stat.mtime - a.file.stat.mtime || a.line - b.line;
     items.sort((a, b) => {
-      if (this.status === "done") return (b.info.doneDate ?? "").localeCompare(a.info.doneDate ?? "");
-      const [ad, ap, an] = order(a);
-      const [bd, bp, bn] = order(b);
-      return String(ad).localeCompare(String(bd)) || Number(ap) - Number(bp) || String(an).localeCompare(String(bn)) || a.line - b.line;
+      if (this.status === "done" && this.sort !== "due") return (b.info.doneDate ?? "").localeCompare(a.info.doneDate ?? "") || byCreated(a, b);
+      if (this.sort === "oldest") return -byCreated(a, b) || a.line - b.line;
+      if (this.sort === "due") return (a.info.due ?? "9999").localeCompare(b.info.due ?? "9999") || byCreated(a, b);
+      return byCreated(a, b);
     });
 
     const groups = new Map<string, TaskItem[]>();
@@ -193,9 +193,11 @@ export class TasksView extends DashView {
     });
     for (const k of keys) {
       const g = this.listEl.createDiv({ cls: "pd-group" });
-      const h = g.createDiv({ cls: "pd-group-head" });
-      h.createSpan({ text: k, cls: `pd-group-title${k === "Overdue" ? " is-overdue" : ""}` });
-      h.createSpan({ text: String(groups.get(k)!.length), cls: "pd-muted" });
+      if (this.group !== "none") {
+        const h = g.createDiv({ cls: "pd-group-head" });
+        h.createSpan({ text: k, cls: `pd-group-title${k === "Overdue" ? " is-overdue" : ""}` });
+        h.createSpan({ text: String(groups.get(k)!.length), cls: "pd-muted" });
+      }
       for (const x of groups.get(k)!) renderTaskRow(g, x, this.plugin, today, this.group !== "note");
     }
   }

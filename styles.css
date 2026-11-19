@@ -51,9 +51,6 @@
 /* Capture */
 .pd-capture-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .pd-capture-input { flex: 1 1 220px; min-width: 0; }
-.pd-capture-preview { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
-.pd-understood { display: flex; gap: 6px; flex-wrap: wrap; }
-.pd-line { display: block; padding: 4px 8px; border-radius: 6px; background: var(--background-secondary); font-size: var(--font-ui-smaller); white-space: pre-wrap; word-break: break-word; }
 .pd-seg { display: inline-flex; border: 1px solid var(--background-modifier-border); border-radius: 8px; overflow: hidden; }
 .pd-seg-btn { border: none; box-shadow: none; border-radius: 0; background: transparent; height: 28px; padding: 0 10px; cursor: pointer; color: var(--text-muted); }
 .pd-seg-btn.is-active { background: var(--background-modifier-hover); color: var(--text-normal); font-weight: var(--font-semibold); }
@@ -153,14 +150,8 @@
 .pd-star.is-on { color: var(--color-orange); }
 .pd-star.is-on svg { fill: currentColor; }
 
-/* Navigation bar */
-.pd-nav { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: -6px 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--background-modifier-border); }
-.pd-nav-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
-.pd-nav-btn { display: inline-flex; align-items: center; gap: 6px; height: auto; padding: 5px 10px; border: none; box-shadow: none; background: transparent; color: var(--text-muted); border-radius: 8px; cursor: pointer; }
-.pd-nav-btn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
-.pd-nav-btn.is-active { background: var(--background-modifier-hover); color: var(--text-normal); font-weight: var(--font-semibold); }
-.pd-nav-actions { display: flex; gap: 6px; }
-@media (max-width: 700px) { .pd-nav-tabs { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; } .pd-nav-btn span:not(.pd-btn-icon) { white-space: nowrap; } }
+/* Home button at the top of other pages */
+.pd-nav { display: flex; margin: -6px 0 14px; }
 
 /* More pages */
 .pd-grow { flex: 1; }
@@ -251,3 +242,17 @@
 /* Quick thought popup */
 .pd-thought-text { width: 100%; min-height: 150px; resize: vertical; }
 .pd-modal .pd-newnote-foot { margin-top: 10px; }
+
+
+/* Collapsible cards */
+.pd-card-head.is-collapsible { cursor: pointer; user-select: none; }
+.pd-card-head.is-collapsible:hover { background: var(--background-modifier-hover); }
+.pd-chevron { display: inline-flex; width: 16px; height: 16px; color: var(--text-muted); align-self: center; }
+.pd-chevron svg { width: 16px; height: 16px; }
+.pd-card.is-collapsed .pd-card-body { display: none; }
+.pd-card.is-collapsed .pd-card-head { border-bottom: none; }
+
+/* Recently modified sits beside New note and scrolls inside its box */
+.pd-toprow { align-items: start; }
+.pd-recent-scroll { max-height: 300px; }
+.pd-task-notename { color: var(--text-muted); }

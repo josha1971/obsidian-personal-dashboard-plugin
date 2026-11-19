@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { insertCaptureLine, parseCapture, formatCaptureLine, parseDuration, formatDuration } from "../src/parser";
+import { insertCaptureLine, parseDuration, formatDuration } from "../src/parser";
 import { parseTaskLine, toggleLine } from "../src/tasks";
 import { parseDateToken, isoWeek, friendlyDate } from "../src/dates";
 import { isFlagged } from "../src/favorites";
@@ -25,35 +25,12 @@ describe("dates", () => {
   });
 });
 
-describe("capture parser", () => {
-  it("reads the example from the brief", () => {
-    const p = parseCapture("call Sam ~15m !low @fri", today);
-    expect(p).toMatchObject({ text: "call Sam", duration: 15, priority: "low", due: "2026-11-06", isTask: true });
-  });
-  it("treats plain text as a note", () => {
-    const p = parseCapture("what if the stall sold jam too #idea", today);
-    expect(p.isTask).toBe(false);
-    expect(p.tags).toEqual(["idea"]);
-    expect(formatCaptureLine(p, today)).toBe("- 2026-11-02 9:30 AM what if the stall sold jam too #idea");
-  });
-  it("handles durations", () => {
+describe("durations", () => {
+  it("reads and writes them", () => {
     expect(parseDuration("1h30m")).toBe(90);
     expect(parseDuration("45")).toBe(45);
+    expect(parseDuration("soon")).toBeUndefined();
     expect(formatDuration(90)).toBe("1h30m");
-  });
-  it("leaves unknown @words alone", () => {
-    const p = parseCapture("email @work team", today);
-    expect(p.text).toBe("email @work team");
-    expect(p.isTask).toBe(false);
-  });
-  it("task mode forces a task and note mode ignores markers", () => {
-    expect(parseCapture("buy milk", today, "task").isTask).toBe(true);
-    expect(parseCapture("call Sam ~15m", today, "note").text).toBe("call Sam ~15m");
-  });
-  it("formats a task line that parses back", () => {
-    const line = formatCaptureLine(parseCapture("call Sam ~15m !low @fri", today), today);
-    expect(line).toBe("- [ ] call Sam ~15m ➕ 2026-11-02 🔽 📅 2026-11-06");
-    expect(parseTaskLine(line)).toMatchObject({ text: "call Sam", duration: 15, priority: "low", due: "2026-11-06", state: "open" });
   });
 });
 
@@ -292,5 +269,27 @@ describe("12-hour time", () => {
     expect(clockName(new Date(2026, 10, 17, 0, 7))).toBe("12.07 AM");
     expect(clockName(new Date(2026, 10, 17, 12, 0))).toBe("12.00 PM");
     expect(clockText(new Date(2026, 10, 17, 9, 30))).toBe("9:30 AM");
+  });
+});
+
+import { onThisDay } from "../src/onthisday";
+describe("on this day", () => {
+  const t = new Date(2026, 10, 19, 9, 0);
+  const at = (y: number, m: number, d: number) => new Date(y, m, d, 12, 0).getTime();
+  it("finds files created or modified on this month and day in earlier years", () => {
+    const hits = onThisDay(
+      [
+        { path: "a.md", created: at(2024, 10, 19), modified: at(2025, 10, 19) },
+        { path: "b.md", created: at(2025, 10, 19), modified: at(2025, 10, 19) },
+        { path: "c.md", created: at(2025, 10, 18), modified: at(2025, 10, 20) },
+        { path: "today.md", created: at(2026, 10, 19), modified: at(2026, 10, 19) },
+      ],
+      t,
+    );
+    expect(hits).toEqual([
+      { path: "a.md", year: 2025, kind: "modified" },
+      { path: "b.md", year: 2025, kind: "both" },
+      { path: "a.md", year: 2024, kind: "created" },
+    ]);
   });
 });

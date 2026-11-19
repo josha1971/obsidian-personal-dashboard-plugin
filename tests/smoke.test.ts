@@ -79,6 +79,9 @@ async function setup() {
   add("Clip new.md", "fresh", { category: ["[[Clipboard]]"], created: day(-1) + "T09:00:00" });
   add("No category.md", "empty category", { category: null, created: day(-5) + "T09:00:00" });
   add("No category either.md", "empty list", { categories: [], created: day(-2) + "T09:00:00" });
+  add("Task list notes.md", "- [ ] Older task ➕ 2025-01-01\n- [ ] Newer task ➕ 2026-11-01\n", { created: "2024-05-05T10:00:00" });
+  const lastYear = new Date(new Date().getFullYear() - 1, new Date().getMonth(), new Date().getDate(), 12, 0);
+  add("Anniversary note.md", "from a year ago " + "x".repeat(300), { created: isoDate(lastYear) + "T12:00:00" }, Math.round((Date.now() - lastYear.getTime()) / DAY));
   add("Whiteboard.canvas", "{}");
   add("Categories/Books.md", "category page", { tags: "categories" });
   app.metadataCache.resolvedLinks = { "Pine & Plum.md": { "Plans/Autumn market stall.md": 1 }, "Taco Place.md": { "Plans/Autumn market stall.md": 1 } };
@@ -113,8 +116,12 @@ describe("plugin smoke test", () => {
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
     const titles = [...v.contentEl.querySelectorAll(".pd-card-title")].map((e: Element) => e.textContent);
     expect(titles).toContain("Favorites");
-    expect(titles.indexOf("Favorites")).toBeLessThan(titles.indexOf("Recently modified"));
+    expect(titles.filter((t) => t !== "From past you").slice(0, 2)).toEqual(["New note", "Recently modified"]);
+    expect(titles).toContain("Review Clipboard");
+    expect(titles).not.toContain("Today's rhythm");
+    expect(titles.filter((t) => t === "Recently modified")).toHaveLength(1);
     const text = v.contentEl.textContent!;
+    expect(text).not.toContain("Capture a thought");
     expect(text).toContain("From past you");
     expect(text).toContain("Dear future me");
     expect(text).not.toContain("Next steps");
@@ -149,6 +156,7 @@ describe("plugin smoke test", () => {
     const names = [...card.querySelectorAll(".pd-logrow-name")].map((e) => e.textContent);
     expect(names).toHaveLength(10);
     expect(names[0]).toBe("Dune");
+    expect(card.querySelector(".pd-scroll.pd-recent-scroll")).toBeTruthy();
     expect(names).not.toContain("Sealed letter");
     expect(names).not.toContain("Old idea");
     expect(v.contentEl.textContent).not.toContain("Recent logs");
@@ -166,10 +174,70 @@ describe("plugin smoke test", () => {
     expect(card.textContent).toContain("Clipboard");
   });
 
-  it("Home puts Add Quick Thought and See all Quick Thoughts first in the button row", async () => {
+  it("Home has no top button bar, and exactly the six shortcut buttons under the date", async () => {
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
-    const labels = [...v.contentEl.querySelectorAll(".pd-actions .pd-btn")].map((b: Element) => b.textContent);
-    expect(labels.slice(0, 4)).toEqual(["Add Quick Thought", "See all Quick Thoughts", "Journal", "Weekly review"]);
+    expect(v.contentEl.querySelector(".pd-nav")).toBeNull();
+    const bar = v.contentEl.querySelector(".pd-actions") as HTMLElement;
+    expect([...bar.querySelectorAll(".pd-btn")].map((b: Element) => b.textContent)).toEqual(["Add Quick Thought", "Log", "Open Inbox", "Tasks", "Logs", "Look Back"]);
+  });
+
+  it("other pages have just a Home button at the top", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-tasks");
+    const nav = v.contentEl.querySelector(".pd-nav") as HTMLElement;
+    expect([...nav.querySelectorAll("button")].map((b: Element) => b.textContent)).toEqual(["Home"]);
+  });
+
+  it("the Add box has only the text box and the Add button, and adds a plain bullet at the top", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    const box = v.contentEl.querySelector(".pd-home-capture") as HTMLElement;
+    expect(box.querySelectorAll("input")).toHaveLength(1);
+    expect((box.querySelector("input") as HTMLInputElement).placeholder).toBe("Add to Random Notes");
+    expect([...box.querySelectorAll("button")].map((b: Element) => b.textContent)).toEqual(["Add"]);
+    (box.querySelector("input") as HTMLInputElement).value = "call Sam ~15m !low @fri";
+    (box.querySelector("button") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ctx.files.get("Inbox.md")!.content.split("\n")[0]).toBe("- call Sam ~15m !low @fri");
+  });
+
+  it("section cards fold shut when you click the title bar, and stay that way", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    const card = () => [...v.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.querySelector(".pd-card-title")?.textContent === "Favorites") as HTMLElement;
+    expect(card().classList.contains("is-collapsed")).toBe(false);
+    (card().querySelector(".pd-card-head") as HTMLElement).click();
+    expect(card().classList.contains("is-collapsed")).toBe(true);
+    expect(ctx.plugin.settings.collapsedSections).toContain("favorites");
+    const again = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    const c2 = [...again.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.querySelector(".pd-card-title")?.textContent === "Favorites") as HTMLElement;
+    expect(c2.classList.contains("is-collapsed")).toBe(true);
+    (c2.querySelector(".pd-card-head") as HTMLElement).click();
+    expect(ctx.plugin.settings.collapsedSections).not.toContain("favorites");
+    for (const title of ["Review Clipboard", "Recently modified", "From the garden"]) {
+      const c = [...again.contentEl.querySelectorAll(".pd-card")].find((x: Element) => x.querySelector(".pd-card-title")?.textContent === title) as HTMLElement;
+      expect(c.querySelector(".pd-card-head")!.classList.contains("is-collapsible"), title).toBe(true);
+    }
+  });
+
+  it("Tasks lists newest first, with the created date and note title next to each other", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-tasks");
+    const rows = [...v.contentEl.querySelectorAll(".pd-task")] as HTMLElement[];
+    const texts = rows.map((r) => r.querySelector(".pd-task-text")!.textContent);
+    expect(texts.indexOf("Newer task")).toBeGreaterThanOrEqual(0);
+    expect(texts.indexOf("Newer task")).toBeLessThan(texts.indexOf("Older task"));
+    const row = rows[texts.indexOf("Newer task")];
+    const meta = row.querySelector(".pd-task-meta")!.textContent!;
+    expect(meta).toMatch(/Created .*·\s*Task list notes$/);
+    expect(v.contentEl.querySelector(".pd-group-head")).toBeNull();
+  });
+
+  it("Look Back shows notes created or last edited on this day in earlier years", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-lookback");
+    const card = [...v.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.querySelector(".pd-card-title")?.textContent === "On this day") as HTMLElement;
+    expect(card).toBeTruthy();
+    const names = [...card.querySelectorAll(".pd-logrow-name")].map((e) => e.textContent);
+    expect(names).toContain("Anniversary note");
+    expect(names).not.toContain("Pine & Plum");
+    expect(card.textContent).toContain(String(new Date().getFullYear() - 1));
+    expect(card.textContent).toContain("created");
   });
 
   it("Add Quick Thought saves a minute-stamped note in the Quick Thoughts folder", async () => {
@@ -251,10 +319,9 @@ describe("plugin smoke test", () => {
     expect(byText["lower case"]).toBe("2026-11-11");
   });
 
-  it("captures to the top of the inbox with Undo text", async () => {
-    expect(await ctx.plugin.capture("call Sam ~15m !low @fri", "auto")).toBe(true);
-    const inbox = ctx.files.get("Inbox.md")!.content;
-    expect(inbox.split("\n")[0]).toMatch(/^- \[ \] call Sam ~15m ➕ \d{4}-\d{2}-\d{2} 🔽 📅 \d{4}-\d{2}-\d{2}$/);
+  it("captures a plain bullet to the top of the inbox", async () => {
+    expect(await ctx.plugin.capture("buy stamps")).toBe(true);
+    expect(ctx.files.get("Inbox.md")!.content.split("\n")[0]).toBe("- buy stamps");
   });
 
   it("toggles a task and its done date", async () => {

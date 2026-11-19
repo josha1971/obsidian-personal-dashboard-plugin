@@ -159,6 +159,15 @@ export async function collectTasks(app: App, settings: DashboardSettings): Promi
   return out;
 }
 
+/** When a task was created, as an ISO string: its own ➕ date, else the note's created property, else the file's creation time. */
+export function taskCreatedKey(t: TaskItem): string {
+  if (t.info.created) return t.info.created;
+  const made = String(t.fm?.["created"] ?? "");
+  if (parseISODate(made)) return made;
+  const d = new Date(t.file.stat.ctime);
+  return `${isoDate(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`;
+}
+
 export function inboxFile(app: App, settings: DashboardSettings): TFile | null {
   const f = app.vault.getAbstractFileByPath(normalizePath(settings.inboxPath));
   return f instanceof TFile ? f : null;
@@ -214,7 +223,7 @@ export async function appendLine(app: App, settings: DashboardSettings, line: st
   const path = normalizePath(settings.inboxPath);
   const existing = app.vault.getAbstractFileByPath(path);
   if (existing instanceof TFile) {
-    await app.vault.process(existing, (data) => insertCaptureLine(data, line, settings.capturePosition));
+    await app.vault.process(existing, (data) => insertCaptureLine(data, line, "top"));
     return existing;
   }
   const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";

@@ -1,13 +1,10 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type DashboardPlugin from "./main";
-import type { CapturePosition } from "./parser";
 import { DEFAULT_LOG_TYPES, LogType, parseLogTypes } from "./logs";
 
 export interface DashboardSettings {
   /** Where captures are appended. One note, so the mobile widget can open it. */
   inboxPath: string;
-  /** Newest capture first ("top") or last ("bottom"). */
-  capturePosition: CapturePosition;
   /** Where new log notes are created. Empty means the vault root. */
   logsFolder: string;
   /** Frontmatter property that holds the category link, e.g. category: ["[[Books]]"]. */
@@ -38,6 +35,8 @@ export interface DashboardSettings {
   gardenSnoozed: Record<string, string>;
   /** Home sections the user switched off. */
   homeHidden: string[];
+  /** Sections the user folded shut (by id), so they stay shut. */
+  collapsedSections: string[];
   /** The Library's last layout, category and grouping, so it opens the way you left it. */
   libraryState?: { category: string; groupKey: string; dateKey: string; layout: "list" | "board" | "calendar" };
   /** One-time changes already applied to saved settings. */
@@ -47,7 +46,6 @@ export interface DashboardSettings {
 
 export const DEFAULT_SETTINGS: DashboardSettings = {
   inboxPath: "Inbox.md",
-  capturePosition: "top",
   logsFolder: "",
   categoryProperty: "category",
   favoriteProperty: "favorite",
@@ -66,11 +64,11 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   gardenExcludeFolders: "00. DAILY NOTES, 00. WEEKLY NOTES, 10. INBOX",
   gardenSnoozed: {},
   homeHidden: [],
+  collapsedSections: [],
   logTypes: DEFAULT_LOG_TYPES,
 };
 
 export const HOME_SECTIONS: [string, string][] = [
-  ["stats", "At a glance numbers"],
   ["favorites", "Favorites"],
   ["clipboard", "Review Clipboard"],
   ["recentLogs", "Recently modified"],
@@ -95,10 +93,6 @@ export class DashboardSettingTab extends PluginSettingTab {
       .setName("Inbox note")
       .setDesc("Quick captures are added to this note (top or bottom, see below). Point your phone widget at it to capture on mobile.")
       .addText((t) => t.setPlaceholder("Inbox.md").setValue(s.inboxPath).onChange(async (v) => { s.inboxPath = v.trim() || "Inbox.md"; await save(); }));
-    new Setting(containerEl)
-      .setName("Add new captures at the")
-      .setDesc("Top puts the newest line first, below any properties and a leading # title. Bottom adds to the end.")
-      .addDropdown((d) => d.addOption("top", "Top of the note").addOption("bottom", "Bottom of the note").setValue(s.capturePosition).onChange(async (v) => { s.capturePosition = v as CapturePosition; await save(); }));
     new Setting(containerEl).setName("Vault").setHeading();
     new Setting(containerEl)
       .setName("Category property")
@@ -121,7 +115,7 @@ export class DashboardSettingTab extends PluginSettingTab {
     for (const [id, label] of HOME_SECTIONS) {
       new Setting(containerEl)
         .setName(label)
-        .setDesc(id === "stats" ? "The row of small counters next to the next best step." : "")
+        .setDesc(id === "recentLogs" ? "The scrollable list next to New note." : "")
         .addToggle((t) => t.setValue(!s.homeHidden.includes(id)).onChange(async (on) => {
           s.homeHidden = on ? s.homeHidden.filter((x) => x !== id) : [...s.homeHidden, id];
           await save();

@@ -14,7 +14,6 @@ import { TasksView } from "./views/tasksView";
 import { LogsView } from "./views/logsView";
 import { CaptureModal, LogModal, QuickThoughtModal } from "./modals";
 import { CatNote, FavoriteItem, LogEntry, TaskItem, appendLine, collectFavorites, collectLogs, isExcluded, linkTarget, noteDate, notesInCategory, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
-import { CaptureMode, describeCapture, formatCaptureLine, parseCapture } from "./parser";
 import { toggleLine } from "./tasks";
 import { buildQuickNote, buildQuickThought } from "./notes";
 import { LogType } from "./logs";
@@ -23,6 +22,7 @@ import { isFlagged } from "./favorites";
 import { DecisionModal, LetterModal, LookBackModal } from "./lookbackModals";
 import { Outcome, lookBackSection } from "./lookback";
 import { isoDate } from "./dates";
+import { DayItem, onThisDay } from "./onthisday";
 import { GardenCandidate, pickGarden } from "./garden";
 
 export default class DashboardPlugin extends Plugin {
@@ -146,6 +146,28 @@ export default class DashboardPlugin extends Plugin {
       if (saved) await this.saveData(this.settings);
     }
     if (this.settings.libraryState) Object.assign(this.libraryState, this.settings.libraryState);
+  }
+
+  /** Remembers that a Home section was folded shut or opened. Does not refresh anything. */
+  setCollapsed(id: string, collapsed: boolean): void {
+    const rest = this.settings.collapsedSections.filter((x) => x !== id);
+    this.settings.collapsedSections = collapsed ? [...rest, id] : rest;
+    void this.saveData(this.settings);
+  }
+
+  /** Notes created or last edited on today's month and day in earlier years. */
+  getOnThisDay(): { file: TFile; year: number; kind: "created" | "modified" | "both" }[] {
+    const sealed = this.sealedPaths();
+    const byPath = new Map<string, TFile>();
+    const items: DayItem[] = [];
+    for (const f of this.app.vault.getFiles()) {
+      if (!["md", "canvas", "base"].includes(f.extension) || sealed.has(f.path) || f.path === this.settings.inboxPath || isExcluded(f, this.settings)) continue;
+      const fm = f.extension === "md" ? (this.app.metadataCache.getFileCache(f)?.frontmatter as Record<string, unknown> | undefined) : undefined;
+      const made = Date.parse(String(fm?.["created"] ?? ""));
+      byPath.set(f.path, f);
+      items.push({ path: f.path, created: Number.isFinite(made) ? made : f.stat.ctime, modified: f.stat.mtime });
+    }
+    return onThisDay(items, new Date()).map((h) => ({ file: byPath.get(h.path)!, year: h.year, kind: h.kind }));
   }
 
   /** Remembers how the Library was set up. Does not refresh anything. */
@@ -415,20 +437,19 @@ export default class DashboardPlugin extends Plugin {
 
   // ---- actions that write -----------------------------------------------
 
-  /** Adds one line to the inbox note. Returns true if it was saved. */
-  async capture(input: string, mode: CaptureMode): Promise<boolean> {
-    const now = new Date();
-    const parsed = parseCapture(input, now, mode);
-    if (!parsed.text) return false;
-    const line = formatCaptureLine(parsed, now);
+  /** Adds a plain bullet to the top of the inbox note (your Random Notes). Returns true if it was saved. */
+  async capture(input: string): Promise<boolean> {
+    const text = input.trim();
+    if (!text) return false;
+    const line = `- ${text}`;
     try {
       const file = await appendLine(this.app, this.settings, line);
-      undoNotice(`Added to ${file.basename} (${describeCapture(parsed, now).join(", ")}).`, async () => {
+      undoNotice(`Added to ${file.basename}.`, async () => {
         if (!(await removeLine(this.app, file, line))) throw new Error("the line has changed since");
       });
       return true;
     } catch (e) {
-      new Notice(`Could not capture: ${(e as Error).message}`);
+      new Notice(`Could not add it: ${(e as Error).message}`);
       return false;
     }
   }

@@ -2,22 +2,22 @@
 
 A rule-based dashboard for a mostly folderless vault. No AI, no network access. Everything it decides is a simple rule you can read in the code.
 
-A navigation bar on every page moves between them in the same tab. **Capture** and **Log** buttons are always in the corner.
+Home has six shortcut buttons (Add Quick Thought, Log, Open Inbox, Tasks, Logs, Look Back). Every other page has a Home button at the top. The remaining pages (Write, Search, Library, Garden, Review, Choose for me) are opened from the command palette, e.g. "Open Garden".
 
 | Page | What it does |
 | --- | --- |
-| **Home** | Capture box, a New note box, today's rhythm, **Favorites**, **Review Clipboard** (new notes waiting for a proper category), the last 10 files modified, a letter from past you when one arrives, and a few notes from the garden. Sections can be switched off in settings. |
+| **Home** | An Add box for your Random Notes, a New note box, **Recently modified** (the last 10 files edited, in a scrollable box), **Favorites**, **Review Clipboard** (new notes waiting for a proper category), a letter from past you when one arrives, and a few notes from the garden. Click a section's title bar to fold it shut. Sections can be switched off in settings. |
 | **Write** | Freewrite with a word goal, prompts drawn from your own notes, and your unfinished drafts (`status: draft`). The draft you're typing survives a restart. |
-| **Tasks** | Every `- [ ]` in the vault. Filter by status, due date, priority, tag, or any property of the note it lives in. Tick off with Undo. |
+| **Tasks** | Every `- [ ]` in the vault, newest first by when each item was created, with the note title beside the date. Filter by status, due date, priority, tag, or any property of the note it lives in. Tick off with Undo. |
 | **Search** | Notes, inbox lines and tasks together. |
 | **Library** | List, board and calendar over any property. Drag a card between board columns to change that one property (with Undo). Click a note for its overview: properties, linked notes grouped by a property, activity by month, and notes sharing a property. |
 | **Logs** | Everything you've logged. Filter, sort, search, favorite. **Explore** with charts: count, rating or spend by month, split by any field, plus a ranking table. |
 | **Garden** | Brings back a few notes you haven't touched for a while (same ones all day, shuffle for more). Recall mode shows only the title first. |
 | **Review** | Your week in numbers and a three-question review saved as one new note. |
-| **Look back** | Letters to future you (they return on Home on the date you pick) and a decision log with a look-back date and outcome. |
+| **Look back** | Letters to future you (they return on Home on the date you pick), a decision log with a look-back date and outcome, and **On this day**: notes created or last edited on today's date in earlier years. |
 | **Choose for me** | Dinner out, cook tonight, movie night, what to read... picked from your own ratings, or from things you saved but haven't tried. |
 
-**Quick capture** turns `call Sam ~15m !low @fri` into a task (15 minutes, low priority, due Friday) and shows how it was read before saving. New lines go to the top of one inbox note, so the mobile widget can open it.
+**The Add box** on Home adds what you type as a plain bullet at the top of your inbox note (your Random Notes), below any properties and a leading `# Title`.
 
 **Quick Thoughts**: *Add Quick Thought* on Home (or the command) opens a box that saves a note named with the date and time to the minute (`2026-11-17 1430`) in the `Quick Thoughts` folder, filed under `[[Quick Thought]]`. *See all Quick Thoughts* opens `Quick Thoughts/All Quick Thoughts` in a new tab, a good place for a Bases table of that category. Folder and category are settings.
 

@@ -1,10 +1,10 @@
 import { Notice, setIcon, setTooltip } from "obsidian";
 import type DashboardPlugin from "./main";
-import type { TaskItem } from "./store";
+import { TaskItem, taskCreatedKey } from "./store";
 import type { TFile } from "obsidian";
 import { friendlyDate, daysBetween, parseISODate } from "./dates";
 import { buildQuickNote } from "./notes";
-import { CaptureMode, describeCapture, formatCaptureLine, formatDuration, parseCapture } from "./parser";
+import { formatDuration } from "./parser";
 
 /** A toast with one Undo button. */
 export function undoNotice(message: string, onUndo: () => Promise<void> | void, ms = 9000): void {
@@ -40,12 +40,41 @@ export function iconButton(parent: HTMLElement, icon: string, label: string, onC
   return b;
 }
 
-export function sectionCard(parent: HTMLElement, title: string, subtitle = "", tone = ""): { card: HTMLElement; body: HTMLElement; head: HTMLElement } {
+/**
+ * A titled card. With `collapse`, clicking the title bar folds the card shut or open, and it
+ * stays that way (the choice is remembered by id).
+ */
+export function sectionCard(
+  parent: HTMLElement,
+  title: string,
+  subtitle = "",
+  tone = "",
+  collapse?: { plugin: DashboardPlugin; id: string },
+): { card: HTMLElement; body: HTMLElement; head: HTMLElement } {
   const card = parent.createDiv({ cls: `pd-card ${tone}`.trim() });
   const head = card.createDiv({ cls: "pd-card-head" });
+  const chevron = collapse ? head.createSpan({ cls: "pd-chevron" }) : null;
   head.createSpan({ text: title, cls: "pd-card-title" });
   if (subtitle) head.createSpan({ text: subtitle, cls: "pd-card-sub" });
-  return { card, body: card.createDiv({ cls: "pd-card-body" }), head };
+  const body = card.createDiv({ cls: "pd-card-body" });
+  if (collapse && chevron) {
+    let collapsed = collapse.plugin.settings.collapsedSections.includes(collapse.id);
+    head.addClass("is-collapsible");
+    head.setAttribute("role", "button");
+    head.setAttribute("tabindex", "0");
+    setTooltip(head, "Click to fold this section shut or open", { delay: 700 });
+    const paint = () => {
+      card.toggleClass("is-collapsed", collapsed);
+      head.setAttribute("aria-expanded", String(!collapsed));
+      chevron.empty();
+      setIcon(chevron, collapsed ? "chevron-right" : "chevron-down");
+    };
+    const toggle = () => { collapsed = !collapsed; paint(); collapse.plugin.setCollapsed(collapse.id, collapsed); };
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.isComposing) { e.preventDefault(); toggle(); } });
+    paint();
+  }
+  return { card, body, head };
 }
 
 /** One task row: a check button, the text, small chips, and the note it lives in. */
@@ -72,73 +101,39 @@ export function renderTaskRow(parent: HTMLElement, t: TaskItem, plugin: Dashboar
   if (t.info.priority) chip(meta, t.info.priority, `pd-pri-${t.info.priority}`);
   if (t.info.duration) chip(meta, formatDuration(t.info.duration));
   for (const tag of t.info.tags) chip(meta, `#${tag}`, "is-tag");
-  if (showNote) meta.createSpan({ text: t.file.basename, cls: "pd-task-note" });
+  const made = taskCreatedKey(t).slice(0, 10);
+  const when = meta.createSpan({ text: `Created ${friendlyDate(made, today)}`, cls: "pd-task-note" });
+  setTooltip(when, `This checklist item was created on ${made}`, { delay: 400 });
+  if (showNote) {
+    meta.createSpan({ text: "·", cls: "pd-task-note" });
+    const note = meta.createSpan({ text: t.file.basename, cls: "pd-task-note pd-task-notename" });
+    setTooltip(note, `In ${t.file.path}`, { delay: 400 });
+  }
   return row;
 }
 
 /**
- * The capture box used on Home and in the capture popup. It shows how the line was
- * understood and the exact line that will be saved.
+ * The Add box: a text box and a button. It adds the text as a plain bullet at the top of your
+ * Random Notes (the inbox note).
  */
 export function renderCaptureBox(parent: HTMLElement, plugin: DashboardPlugin, opts: { autofocus?: boolean; onSaved?: () => void } = {}): HTMLInputElement {
-  const wrap = parent.createDiv({ cls: "pd-capture" });
-  const row = wrap.createDiv({ cls: "pd-capture-row" });
-  const input = row.createEl("input", {
-    type: "text",
-    cls: "pd-capture-input",
-    attr: { placeholder: "Capture a thought, or a task: call Sam ~15m !low @fri" },
-  });
-  setTooltip(input, "Plain text is saved as a note. Add ~15m (time), !low !med !high (priority), @fri @tomorrow @+3d (date) to make it a task", { delay: 500 });
-
-  let mode: CaptureMode = "auto";
-  const modes = row.createDiv({ cls: "pd-seg" });
-  const modeBtns = new Map<CaptureMode, HTMLButtonElement>();
-  const modeTips: Record<CaptureMode, string> = {
-    auto: "Becomes a task only if you use ~, ! or @ words",
-    task: "Always save as a task",
-    note: "Always save as a plain note, nothing is interpreted",
-  };
-  for (const [m, label] of [["auto", "Auto"], ["task", "Task"], ["note", "Note"]] as [CaptureMode, string][]) {
-    const b = modes.createEl("button", { text: label, cls: "pd-seg-btn" });
-    setTooltip(b, modeTips[m], { delay: 300 });
-    b.addEventListener("click", () => { mode = m; update(); input.focus(); });
-    modeBtns.set(m, b);
-  }
+  const row = parent.createDiv({ cls: "pd-capture-row" });
+  const input = row.createEl("input", { type: "text", cls: "pd-capture-input", attr: { placeholder: "Add to Random Notes" } });
+  setTooltip(input, `Adds a bullet to the top of ${plugin.settings.inboxPath} (Enter)`, { delay: 500 });
   const save = row.createEl("button", { text: "Add", cls: "pd-btn mod-cta" });
-  setTooltip(save, "Adds one line to your inbox note (Enter)", { delay: 300 });
-
-  const preview = wrap.createDiv({ cls: "pd-capture-preview" });
-
-  const update = () => {
-    for (const [m, b] of modeBtns) b.toggleClass("is-active", m === mode);
-    preview.empty();
-    const text = input.value.trim();
-    if (!text) {
-      preview.createSpan({ text: `Goes to ${plugin.settings.inboxPath}. Nothing is saved until you press Enter.`, cls: "pd-muted" });
-      return;
-    }
-    const now = new Date();
-    const p = parseCapture(text, now, mode);
-    const understood = preview.createDiv({ cls: "pd-understood" });
-    for (const bit of describeCapture(p, now)) chip(understood, bit, bit === "Task" ? "is-task" : "");
-    preview.createEl("code", { text: formatCaptureLine(p, now), cls: "pd-line" });
-  };
+  setTooltip(save, `Adds a bullet to the top of ${plugin.settings.inboxPath}`, { delay: 300 });
 
   const submit = async () => {
     if (!input.value.trim()) return;
-    const ok = await plugin.capture(input.value, mode);
-    if (ok) {
+    if (await plugin.capture(input.value)) {
       input.value = "";
-      update();
       opts.onSaved?.();
     }
   };
-  input.addEventListener("input", update);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); void submit(); }
   });
   save.addEventListener("click", () => void submit());
-  update();
   if (opts.autofocus) window.setTimeout(() => input.focus(), 30);
   return input;
 }

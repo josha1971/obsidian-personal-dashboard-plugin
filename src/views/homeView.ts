@@ -1,8 +1,8 @@
-import { Notice, WorkspaceLeaf, setTooltip } from "obsidian";
+import { WorkspaceLeaf, setTooltip } from "obsidian";
 import type DashboardPlugin from "../main";
 import { DashView } from "./base";
 import { VIEW_HOME } from "../constants";
-import { daysBetween, friendlyDate, isoDate, isoWeek, parseISODate, startOfDay, timeAgo } from "../dates";
+import { friendlyDate, isoDate, isoWeek, startOfDay, timeAgo } from "../dates";
 import { readInbox } from "../store";
 import { NewNoteDraft, chip, iconButton, renderCaptureBox, renderNewNoteBox, sectionCard, starButton } from "../ui";
 import { letterExcerpt } from "./lookbackView";
@@ -24,7 +24,7 @@ export class HomeView extends DashView {
 
   protected async render(isCurrent: () => boolean): Promise<void> {
     const s = this.plugin.settings;
-    const [tasks, inbox] = await Promise.all([this.plugin.getTasks(), readInbox(this.app, s)]);
+    const inbox = await readInbox(this.app, s);
     const today = startOfDay(new Date());
     const todayIso = isoDate(today);
 
@@ -34,7 +34,6 @@ export class HomeView extends DashView {
 
     const el = this.contentEl;
     el.empty();
-    this.renderNav(el);
 
     // Header
     const head = el.createDiv({ cls: "pd-home-head" });
@@ -47,16 +46,11 @@ export class HomeView extends DashView {
     // Shortcuts
     const bar = el.createDiv({ cls: "pd-actions" });
     iconButton(bar, "message-square-plus", "Add Quick Thought", () => this.plugin.openQuickThoughtModal());
-    iconButton(bar, "list", "See all Quick Thoughts", () => void this.plugin.openAllQuickThoughts());
-    iconButton(bar, "book-marked", "Journal", () => this.openJournal());
-    iconButton(bar, "calendar-check", "Weekly review", () => void this.plugin.navigate(this.leaf, "review"));
-    iconButton(bar, "mail", "Write to future me", () => this.plugin.openLetterModal());
-    iconButton(bar, "flag", "Log a decision", () => this.plugin.openDecisionModal());
-    iconButton(bar, "inbox", "Open inbox", () => void this.plugin.openInbox());
-
-    const open = tasks.filter((t) => t.info.state === "open");
-    const overdue = open.filter((t) => t.info.due && daysBetween(today, parseISODate(t.info.due) ?? today) < 0);
-    const doneToday = tasks.filter((t) => t.info.state === "done" && t.info.doneDate === todayIso).length;
+    iconButton(bar, "plus", "Log", () => this.plugin.openLogModal(), "mod-cta");
+    iconButton(bar, "inbox", "Open Inbox", () => void this.plugin.openInbox());
+    iconButton(bar, "check-square", "Tasks", () => void this.plugin.navigate(this.leaf, "tasks"));
+    iconButton(bar, "book-open", "Logs", () => void this.plugin.navigate(this.leaf, "logs"));
+    iconButton(bar, "history", "Look Back", () => void this.plugin.navigate(this.leaf, "lookback"));
 
     // A letter from past you
     if (arrived.length) {
@@ -72,50 +66,24 @@ export class HomeView extends DashView {
       keep.addEventListener("click", () => void this.plugin.keepLetter(l.file));
     }
 
-    // Top row: next best step + the day at a glance
+    // Top row: New note, and the files edited most recently
     const top = el.createDiv({ cls: "pd-toprow" });
-    if (!this.shown("stats")) top.addClass("is-single");
+    if (!this.shown("recentLogs")) top.addClass("is-single");
     const nn = sectionCard(top, "New note", "start writing, it opens in a new tab", "pd-newnote").body;
     renderNewNoteBox(nn, this.plugin, this.draft);
-    if (this.shown("stats")) {
-      const stats = sectionCard(top, "Today's rhythm", "", "pd-stats-card").body;
-      const grid = stats.createDiv({ cls: "pd-stats" });
-      const words = this.plugin.getWordsOn(todayIso);
-      this.stat(grid, `${words}`, `/ ${s.writeGoal} words`, () => void this.plugin.navigate(this.leaf, "write"), "Words saved from Write today");
-      this.stat(grid, String(doneToday), "tasks done", () => void this.plugin.navigate(this.leaf, "tasks"), "Tasks ticked off today (needs the done date the plugin adds)");
-      this.stat(grid, String(overdue.length), "overdue", () => void this.plugin.navigate(this.leaf, "tasks"), "Open tasks with a due date in the past", overdue.length > 0 ? "is-warn" : "");
-      this.stat(grid, String(inbox.length), "in the inbox", () => void this.plugin.openInbox(), "Lines waiting in your inbox note");
-    }
+    if (this.shown("recentLogs")) this.renderRecent(top);
 
-    // Favorites, near the top so they are one click away
+    // Favorites
     if (this.shown("favorites")) this.renderFavorites(el);
 
     // Review Clipboard: new notes waiting for a proper category
     if (this.shown("clipboard")) this.renderClipboard(el, today);
 
-    // The last 10 files edited
-    if (this.shown("recentLogs")) {
-      const recent = this.plugin.getRecentlyModified(10);
-      const rl = sectionCard(el, "Recently modified", recent.length ? `last ${recent.length}` : "", "pd-tone-green");
-      if (!recent.length) rl.body.createDiv({ cls: "pd-empty", text: "No notes yet." });
-      for (const f of recent) {
-        const row = rl.body.createDiv({ cls: "pd-logrow" });
-        const name = row.createSpan({ text: f.basename, cls: "pd-logrow-name" });
-        name.addEventListener("click", () => void this.plugin.openFile(f));
-        setTooltip(name, `Open ${f.path} in a new tab`, { delay: 400 });
-        const cat = this.plugin.categoryOf(f);
-        if (cat) chip(row, cat, "is-type");
-        else if (f.extension !== "md") chip(row, f.extension === "canvas" ? "Canvas" : "Base", "is-type");
-        if (f.parent && !f.parent.isRoot()) row.createSpan({ text: f.parent.name, cls: "pd-muted pd-logrow-detail" });
-        row.createSpan({ text: timeAgo(f.stat.mtime), cls: "pd-muted pd-logrow-date" });
-      }
-    }
-
     // From the garden
     if (this.shown("garden")) {
       const { picks, waiting } = this.plugin.gardenToday(3);
       if (picks.length) {
-        const gc = sectionCard(el, "From the garden", `${waiting} waiting`, "pd-tone-green");
+        const gc = sectionCard(el, "From the garden", `${waiting} waiting`, "pd-tone-green", { plugin: this.plugin, id: "garden" });
         for (const f of picks) {
           const row = gc.body.createDiv({ cls: "pd-logrow" });
           row.createSpan({ text: f.basename, cls: "pd-logrow-name" }).addEventListener("click", () => void this.plugin.openFile(f));
@@ -127,15 +95,32 @@ export class HomeView extends DashView {
     }
   }
 
-  private openJournal(): void {
-    const cmds = (this.app as unknown as { commands: { executeCommandById(id: string): boolean } }).commands;
-    if (!cmds.executeCommandById("daily-notes")) new Notice("Turn on the Daily notes core plugin to use Journal.");
+  /** The last 10 files edited, in a box that scrolls. */
+  private renderRecent(parent: HTMLElement): void {
+    const recent = this.plugin.getRecentlyModified(10);
+    const rl = sectionCard(parent, "Recently modified", recent.length ? `last ${recent.length}` : "", "pd-tone-green", { plugin: this.plugin, id: "recent" });
+    if (!recent.length) {
+      rl.body.createDiv({ cls: "pd-empty", text: "No notes yet." });
+      return;
+    }
+    const list = rl.body.createDiv({ cls: "pd-scroll pd-recent-scroll" });
+    for (const f of recent) {
+      const row = list.createDiv({ cls: "pd-logrow" });
+      const name = row.createSpan({ text: f.basename, cls: "pd-logrow-name" });
+      name.addEventListener("click", () => void this.plugin.openFile(f));
+      setTooltip(name, `Open ${f.path} in a new tab`, { delay: 400 });
+      const cat = this.plugin.categoryOf(f);
+      if (cat) chip(row, cat, "is-type");
+      else if (f.extension !== "md") chip(row, f.extension === "canvas" ? "Canvas" : "Base", "is-type");
+      if (f.parent && !f.parent.isRoot()) row.createSpan({ text: f.parent.name, cls: "pd-muted pd-logrow-detail" });
+      row.createSpan({ text: timeAgo(f.stat.mtime), cls: "pd-muted pd-logrow-date" });
+    }
   }
 
   private renderClipboard(parent: HTMLElement, today: Date): void {
     const items = this.plugin.getClipboard();
     const name = this.plugin.settings.clipboardCategory;
-    const card = sectionCard(parent, "Review Clipboard", items.length ? `${items.length} ${items.length === 1 ? "note" : "notes"} · newest first` : "", "pd-tone-red");
+    const card = sectionCard(parent, "Review Clipboard", items.length ? `${items.length} ${items.length === 1 ? "note" : "notes"} · newest first` : "", "pd-tone-red", { plugin: this.plugin, id: "clipboard" });
     if (!items.length) {
       card.body.createDiv({ cls: "pd-empty", text: `Nothing to review. Notes made from New note are filed under ${name}, and notes with an empty category show up here too.` });
       return;
@@ -154,7 +139,7 @@ export class HomeView extends DashView {
 
   private renderFavorites(parent: HTMLElement): void {
     const favs = this.plugin.getFavorites();
-    const card = sectionCard(parent, "Favorites", favs.length ? `${favs.length} ${favs.length === 1 ? "note" : "notes"}` : "", "pd-tone-gold");
+    const card = sectionCard(parent, "Favorites", favs.length ? `${favs.length} ${favs.length === 1 ? "note" : "notes"}` : "", "pd-tone-gold", { plugin: this.plugin, id: "favorites" });
     if (!favs.length) {
       card.body.createDiv({ cls: "pd-empty", text: "Nothing here yet. Open a note, then use the command Toggle favorite for this note or canvas, or the note's ... menu, or the star in Logs." });
       return;
@@ -174,11 +159,4 @@ export class HomeView extends DashView {
     if (favs.length > 40) card.body.createDiv({ cls: "pd-muted pd-summary", text: `Showing 40 of ${favs.length}.` });
   }
 
-  private stat(parent: HTMLElement, value: string, label: string, onClick: () => void, tip: string, cls = ""): void {
-    const b = parent.createEl("button", { cls: `pd-stat ${cls}`.trim() });
-    b.createDiv({ cls: "pd-stat-value", text: value });
-    b.createDiv({ cls: "pd-stat-label", text: label });
-    setTooltip(b, tip, { delay: 300 });
-    b.addEventListener("click", onClick);
-  }
 }

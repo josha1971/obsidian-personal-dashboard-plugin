@@ -44,7 +44,7 @@ export class LookbackView extends DashView {
     const right = cols.createDiv({ cls: "pd-writeside" });
 
     // Letters
-    const lc = sectionCard(left, "Letters", letters.length ? `${arrived.length} arrived · ${sealed.length} sealed` : "", "pd-tone-gold");
+    const lc = sectionCard(left, "Letters", letters.length ? `${arrived.length} arrived · ${sealed.length} sealed` : "", "pd-tone-gold", { plugin: this.plugin, id: "lb-letters" });
     if (!letters.length) lc.body.createDiv({ cls: "pd-empty", text: "None yet. Write one and pick the day it should come back." });
     for (const l of arrived.filter((x) => !x.kept)) {
       const box = lc.body.createDiv({ cls: "pd-letter" });
@@ -80,7 +80,7 @@ export class LookbackView extends DashView {
     const reviewed = decisions.filter((d) => d.status === "reviewed");
     const tally = tallyOutcomes(reviewed.map((d) => d.outcome ?? "").filter(Boolean));
     const sub = tally.reviewed ? `${tally.right} of ${tally.reviewed} turned out right` : decisions.length ? `${decisions.length}` : "";
-    const dc = sectionCard(right, "Decisions", sub, "pd-tone-red");
+    const dc = sectionCard(right, "Decisions", sub, "pd-tone-red", { plugin: this.plugin, id: "lb-decisions" });
     if (!decisions.length) dc.body.createDiv({ cls: "pd-empty", text: "None yet. Log a decision and you'll be asked how it went." });
 
     const decRow = (parent: HTMLElement, d: (typeof decisions)[number], action?: () => void) => {
@@ -93,5 +93,24 @@ export class LookbackView extends DashView {
     if (due.length) { dc.body.createDiv({ text: "Ready to look back on", cls: "pd-group-title pd-subhead" }); for (const d of due) decRow(dc.body, d, () => void this.plugin.openLookBack(d.file)); }
     if (waiting.length) { dc.body.createDiv({ text: "Waiting", cls: "pd-group-title pd-subhead" }); for (const d of waiting) decRow(dc.body, d); }
     if (reviewed.length) { dc.body.createDiv({ text: "Looked back on", cls: "pd-group-title pd-subhead" }); for (const d of reviewed.reverse()) decRow(dc.body, d); }
+
+    // On this day: notes created or last edited today's month and day in earlier years
+    const hits = this.plugin.getOnThisDay();
+    const od = sectionCard(el, "On this day", hits.length ? `${hits.length} ${hits.length === 1 ? "note" : "notes"} from earlier years` : "", "pd-tone-blue", { plugin: this.plugin, id: "lb-onthisday" });
+    if (!hits.length) od.body.createDiv({ cls: "pd-empty", text: "No note was created or last edited on this day in an earlier year." });
+    else {
+      const list = od.body.createDiv({ cls: "pd-scroll" });
+      let year = 0;
+      for (const h of hits) {
+        if (h.year !== year) {
+          year = h.year;
+          list.createDiv({ text: String(year), cls: "pd-group-title pd-subhead" });
+        }
+        const row = list.createDiv({ cls: "pd-logrow" });
+        row.createSpan({ text: h.file.basename, cls: "pd-logrow-name" }).addEventListener("click", () => void this.plugin.openFile(h.file));
+        chip(row, h.kind === "both" ? "created & edited" : h.kind === "created" ? "created" : "last edited", "is-type");
+        if (h.file.parent && !h.file.parent.isRoot()) row.createSpan({ text: h.file.parent.name, cls: "pd-muted pd-logrow-detail" });
+      }
+    }
   }
 }

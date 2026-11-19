@@ -19,7 +19,6 @@ export class OverviewView extends DashView {
   getViewType() { return VIEW_OVERVIEW; }
   getDisplayText() { return "Note overview"; }
   getIcon() { return "layout-list"; }
-  protected pageId() { return "library" as const; }
 
   getState(): Record<string, unknown> { return { path: this.path }; }
   async setState(state: { path?: string }, result: ViewStateResult): Promise<void> {
