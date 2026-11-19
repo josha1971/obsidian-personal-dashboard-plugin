@@ -22,6 +22,8 @@ export interface DashboardSettings {
   writeCategory: string;
   /** Notes made from Home are filed here, and Home lists them (plus notes with an empty category) for review. */
   clipboardCategory: string;
+  /** The category buttons on the New note box (the clipboard category is always among them). */
+  newNoteCategories: string[];
   /** Quick thoughts are saved in this folder, filed under this category. */
   quickThoughtFolder: string;
   quickThoughtCategory: string;
@@ -56,6 +58,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   letterCategory: "Letters",
   writeCategory: "Writing",
   clipboardCategory: "Clipboard",
+  newNoteCategories: ["Work", "Journal", "Clipboard"],
   quickThoughtFolder: "Quick Thoughts",
   quickThoughtCategory: "Quick Thought",
   writeGoal: 300,
@@ -130,6 +133,10 @@ export class DashboardSettingTab extends PluginSettingTab {
     text("Letter category", "Letters to future you use this category.", "letterCategory");
     text("Writing category", "Freewrite notes from the Write page use this category.", "writeCategory");
     text("Clipboard category", "Notes made from the New note box on Home are filed here. Review Clipboard also lists notes with an empty category.", "clipboardCategory");
+    new Setting(containerEl)
+      .setName("New note category buttons")
+      .setDesc("Comma separated. These are the buttons on the New note box. The Clipboard category is always included and is the one chosen to start with.")
+      .addText((t) => t.setValue(s.newNoteCategories.join(", ")).onChange(async (v) => { s.newNoteCategories = v.split(",").map((x) => x.trim()).filter(Boolean); await save(); }));
     new Setting(containerEl)
       .setName("Quick Thoughts folder")
       .setDesc("Add Quick Thought saves notes here. See all Quick Thoughts opens the note called All Quick Thoughts inside it.")

@@ -54,3 +54,17 @@ export function buildQuickThought(text: string, now: Date, opts: { category: str
   const content = buildNoteText([["created", raw(isoDateTime(now))], ["tags", raw("")], [opts.categoryProperty, [wikilink(opts.category)]]], text);
   return { filename: `${isoDate(now)} ${clockName(now)}.md`, content };
 }
+
+/**
+ * The category buttons on the New note box, in order, without duplicates. The clipboard
+ * category is always one of them, since it is the default.
+ */
+export function categoryChoices(list: string[], clipboard: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of [...list, clipboard]) {
+    const name = c.trim();
+    if (name && !seen.has(name.toLowerCase())) { seen.add(name.toLowerCase()); out.push(name); }
+  }
+  return out;
+}

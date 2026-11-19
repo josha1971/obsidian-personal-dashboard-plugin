@@ -27,7 +27,7 @@
 .pd-card-body { padding: 4px 14px 8px; }
 .pd-tone-red .pd-card-title { color: var(--color-red); }
 .pd-tone-green .pd-card-title { color: var(--color-green); }
-.pd-toprow { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 0; }
+.pd-toprow { display: grid; grid-template-columns: minmax(250px, 0.7fr) 1.6fr; gap: 16px; margin-bottom: 0; }
 .pd-next { padding: 14px 16px; background: var(--background-secondary); }
 .pd-next-title { margin: 2px 0 6px; font-size: 1.15em; }
 .pd-next-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
@@ -232,7 +232,9 @@
 
 /* New note box on Home */
 .pd-newnote .pd-card-body { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; padding-bottom: 12px; }
-.pd-newnote-text { min-height: 110px; flex: 1; resize: vertical; }
+.pd-newnote-text { min-height: 62px; resize: vertical; }
+.pd-newnote-cats { margin: 2px 0; }
+.pd-newnote-cats .pd-pick { padding: 3px 10px; }
 .pd-newnote-foot { display: flex; align-items: center; gap: 10px; }
 .pd-newnote-hint { font-size: var(--font-ui-smaller); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -254,5 +256,5 @@
 
 /* Recently modified sits beside New note and scrolls inside its box */
 .pd-toprow { align-items: start; }
-.pd-recent-scroll { max-height: 300px; }
+.pd-recent-scroll { max-height: 340px; }
 .pd-task-notename { color: var(--text-muted); }

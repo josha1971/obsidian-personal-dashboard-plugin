@@ -6,7 +6,7 @@ Home has six shortcut buttons (Add Quick Thought, Log, Open Inbox, Tasks, Logs, 
 
 | Page | What it does |
 | --- | --- |
-| **Home** | An Add box for your Random Notes, a New note box, **Recently modified** (the last 10 files edited, in a scrollable box), **Favorites**, **Review Clipboard** (new notes waiting for a proper category), a letter from past you when one arrives, and a few notes from the garden. Click a section's title bar to fold it shut. Sections can be switched off in settings. |
+| **Home** | An Add box for your Random Notes, a compact New note box (with Work, Journal and Clipboard category buttons), **Recently modified** (the last 10 files edited, in a scrollable box), **Favorites**, **Review Clipboard** (new notes waiting for a proper category), a letter from past you when one arrives, and a few notes from the garden. Click a section's title bar to fold it shut. Sections can be switched off in settings. |
 | **Write** | Freewrite with a word goal, prompts drawn from your own notes, and your unfinished drafts (`status: draft`). The draft you're typing survives a restart. |
 | **Tasks** | Every `- [ ]` in the vault, newest first by when each item was created, with the note title beside the date. Filter by status, due date, priority, tag, or any property of the note it lives in. Tick off with Undo. |
 | **Search** | Notes, inbox lines and tasks together. |

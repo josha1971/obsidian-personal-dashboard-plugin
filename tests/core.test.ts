@@ -254,7 +254,7 @@ describe("timeAgo", () => {
   });
 });
 
-import { buildQuickThought } from "../src/notes";
+import { buildQuickThought, categoryChoices } from "../src/notes";
 describe("quick thought", () => {
   it("is named with the date and time to the minute and filed under its category", () => {
     const n = buildQuickThought("Call the dentist.", new Date(2026, 10, 17, 14, 5), { category: "Quick Thought", categoryProperty: "category" });
@@ -291,5 +291,12 @@ describe("on this day", () => {
       { path: "b.md", year: 2025, kind: "both" },
       { path: "a.md", year: 2024, kind: "created" },
     ]);
+  });
+});
+
+describe("new note category buttons", () => {
+  it("keeps the order, drops duplicates and always includes the clipboard category", () => {
+    expect(categoryChoices(["Work", "Journal", "Clipboard"], "Clipboard")).toEqual(["Work", "Journal", "Clipboard"]);
+    expect(categoryChoices(["Work", "work", " Journal "], "Inbox")).toEqual(["Work", "Journal", "Inbox"]);
   });
 });

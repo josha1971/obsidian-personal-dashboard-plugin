@@ -9,7 +9,7 @@ import { letterExcerpt } from "./lookbackView";
 import { ago } from "./gardenView";
 
 export class HomeView extends DashView {
-  private draft: NewNoteDraft = { title: "", text: "" };
+  private draft: NewNoteDraft = { title: "", text: "", category: "" };
 
   constructor(leaf: WorkspaceLeaf, plugin: DashboardPlugin) {
     super(leaf, plugin);
@@ -69,7 +69,7 @@ export class HomeView extends DashView {
     // Top row: New note, and the files edited most recently
     const top = el.createDiv({ cls: "pd-toprow" });
     if (!this.shown("recentLogs")) top.addClass("is-single");
-    const nn = sectionCard(top, "New note", "start writing, it opens in a new tab", "pd-newnote").body;
+    const nn = sectionCard(top, "New note", "opens in a new tab", "pd-newnote").body;
     renderNewNoteBox(nn, this.plugin, this.draft);
     if (this.shown("recentLogs")) this.renderRecent(top);
 

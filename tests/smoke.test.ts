@@ -129,6 +129,24 @@ describe("plugin smoke test", () => {
     expect(text).toContain("From the garden");
   });
 
+  it("New note has Work, Journal and Clipboard buttons, Clipboard chosen to start, and files under the one chosen", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    const card = [...v.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.querySelector(".pd-card-title")?.textContent === "New note") as HTMLElement;
+    const btns = [...card.querySelectorAll(".pd-newnote-cats .pd-pick")] as HTMLElement[];
+    expect(btns.map((b) => b.textContent)).toEqual(["Work", "Journal", "Clipboard"]);
+    expect(btns.filter((b) => b.classList.contains("is-active")).map((b) => b.textContent)).toEqual(["Clipboard"]);
+    btns[0].click();
+    expect(btns.filter((b) => b.classList.contains("is-active")).map((b) => b.textContent)).toEqual(["Work"]);
+    const [title] = card.querySelectorAll("input") as any;
+    title.value = "Quarterly goals"; title.dispatchEvent(new Event("input"));
+    (card.querySelector(".mod-cta") as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    const key = [...ctx.files.keys()].find((k) => /^\d{4}-\d{2}-\d{2} - Quarterly goals\.md$/.test(k))!;
+    expect(ctx.files.get(key)!.content).toContain('category:\n  - "[[Work]]"');
+    // After creating, it goes back to Clipboard.
+    expect(btns.filter((b) => b.classList.contains("is-active")).map((b) => b.textContent)).toEqual(["Clipboard"]);
+  });
+
   it("Home has a New note box that creates the note and opens it in a new tab", async () => {
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
     expect(v.contentEl.textContent).not.toContain("Next best step");

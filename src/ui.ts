@@ -3,7 +3,7 @@ import type DashboardPlugin from "./main";
 import { TaskItem, taskCreatedKey } from "./store";
 import type { TFile } from "obsidian";
 import { friendlyDate, daysBetween, parseISODate } from "./dates";
-import { buildQuickNote } from "./notes";
+import { buildQuickNote, categoryChoices } from "./notes";
 import { formatDuration } from "./parser";
 
 /** A toast with one Undo button. */
@@ -151,31 +151,49 @@ export function starButton(parent: HTMLElement, file: TFile, on: boolean, plugin
 }
 
 /** The draft in the New note box. Kept by the page so a refresh does not wipe what you are typing. */
-export interface NewNoteDraft { title: string; text: string }
+export interface NewNoteDraft { title: string; text: string; category: string }
 
-/** Two fields: a title and a start for the note. Creating it opens the note in a new tab. */
+/** A title, a short start for the note, and category buttons. Creating it opens the note in a new tab. */
 export function renderNewNoteBox(parent: HTMLElement, plugin: DashboardPlugin, draft: NewNoteDraft): void {
+  const choices = categoryChoices(plugin.settings.newNoteCategories, plugin.settings.clipboardCategory);
+  const fallback = plugin.settings.clipboardCategory;
+  if (!choices.includes(draft.category)) draft.category = fallback;
+
   const title = parent.createEl("input", { type: "text", cls: "pd-input", attr: { placeholder: "Title. The date is added in front of it" } });
   setTooltip(title, "The note is named like 2026-11-10 - Your title", { delay: 500 });
   title.value = draft.title;
-  const area = parent.createEl("textarea", { cls: "pd-input pd-textarea pd-newnote-text", attr: { placeholder: "Start writing..." } });
+  const area = parent.createEl("textarea", { cls: "pd-input pd-textarea pd-newnote-text", attr: { placeholder: "Start writing...", rows: "3" } });
   area.value = draft.text;
+
+  const cats = parent.createDiv({ cls: "pd-chips pd-newnote-cats" });
+  const catBtns: HTMLButtonElement[] = [];
+  const paintCats = () => catBtns.forEach((b) => b.toggleClass("is-active", b.textContent === draft.category));
+  for (const c of choices) {
+    const b = cats.createEl("button", { text: c, cls: "pd-pick" });
+    setTooltip(b, `File the new note under [[${c}]]`, { delay: 300 });
+    b.addEventListener("click", () => { draft.category = c; paintCats(); paint(); });
+    catBtns.push(b);
+  }
+  paintCats();
+
   const foot = parent.createDiv({ cls: "pd-newnote-foot" });
   const hint = foot.createSpan({ cls: "pd-muted pd-grow pd-newnote-hint" });
   const create = foot.createEl("button", { text: "Create and open", cls: "pd-btn mod-cta" });
-  setTooltip(create, "Creates a new note filed under Clipboard and opens it in a new tab (Ctrl/Cmd+Enter)", { delay: 300 });
+  setTooltip(create, "Creates a new note in the chosen category and opens it in a new tab (Ctrl/Cmd+Enter)", { delay: 300 });
 
   const paint = () => {
-    const n = buildQuickNote(draft.title, draft.text, new Date(), { category: plugin.settings.clipboardCategory, categoryProperty: plugin.settings.categoryProperty });
+    const n = buildQuickNote(draft.title, draft.text, new Date(), { category: draft.category, categoryProperty: plugin.settings.categoryProperty });
     const folder = plugin.settings.logsFolder;
-    hint.setText(`Will be saved as ${folder ? folder + "/" : ""}${n.filename}`);
+    hint.setText(`${folder ? folder + "/" : ""}${n.filename}`);
   };
   title.addEventListener("input", () => { draft.title = title.value; paint(); });
   area.addEventListener("input", () => { draft.text = area.value; paint(); });
   const submit = async () => {
-    if (await plugin.createQuickNote(draft.title, draft.text)) {
+    if (await plugin.createQuickNote(draft.title, draft.text, draft.category)) {
       draft.title = "";
       draft.text = "";
+      draft.category = fallback;
+      paintCats();
       title.value = "";
       area.value = "";
       paint();
