@@ -39,6 +39,8 @@ export interface DashboardSettings {
   homeHidden: string[];
   /** Sections the user folded shut (by id), so they stay shut. */
   collapsedSections: string[];
+  /** Which list the Home box shows. */
+  homeTab?: "recent" | "clipboard";
   /** The Library's last layout, category and grouping, so it opens the way you left it. */
   libraryState?: { category: string; groupKey: string; dateKey: string; layout: "list" | "board" | "calendar" };
   /** One-time changes already applied to saved settings. */
@@ -73,9 +75,8 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
 
 export const HOME_SECTIONS: [string, string][] = [
   ["favorites", "Favorites"],
-  ["clipboard", "Review Clipboard"],
-  ["recentLogs", "Recently modified"],
-  ["garden", "From the garden"],
+  ["clipboard", "Review Clipboard tab"],
+  ["recentLogs", "Recently modified tab"],
 ];
 
 export class DashboardSettingTab extends PluginSettingTab {
@@ -118,7 +119,7 @@ export class DashboardSettingTab extends PluginSettingTab {
     for (const [id, label] of HOME_SECTIONS) {
       new Setting(containerEl)
         .setName(label)
-        .setDesc(id === "recentLogs" ? "The scrollable list next to New note." : "")
+        .setDesc(id === "recentLogs" ? "The two lists share one box beside New note. Switch both off to hide it." : "")
         .addToggle((t) => t.setValue(!s.homeHidden.includes(id)).onChange(async (on) => {
           s.homeHidden = on ? s.homeHidden.filter((x) => x !== id) : [...s.homeHidden, id];
           await save();

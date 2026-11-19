@@ -91,6 +91,9 @@ async function setup() {
   return { app, plugin, files, add };
 }
 
+const listsBox = (v: any) => v.contentEl.querySelector(".pd-lists") as HTMLElement;
+const tab = (v: any, label: string) => [...listsBox(v).querySelectorAll(".pd-tab")].find((b: Element) => b.textContent!.startsWith(label)) as HTMLElement;
+
 const render = async (plugin: any, app: any, type: string, state?: any) => {
   const view = (plugin as any).views[type]({ app, setViewState: async () => {} });
   if (state) await view.setState(state, {});
@@ -112,21 +115,28 @@ describe("plugin smoke test", () => {
     }
   });
 
-  it("Home shows the key sections in order", async () => {
+  it("Home shows Favorites under the buttons, then New note beside one two-tab box, and no garden", async () => {
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
     const titles = [...v.contentEl.querySelectorAll(".pd-card-title")].map((e: Element) => e.textContent);
-    expect(titles).toContain("Favorites");
-    expect(titles.filter((t) => t !== "From past you").slice(0, 2)).toEqual(["New note", "Recently modified"]);
-    expect(titles).toContain("Review Clipboard");
-    expect(titles).not.toContain("Today's rhythm");
-    expect(titles.filter((t) => t === "Recently modified")).toHaveLength(1);
+    expect(titles).toEqual(["Favorites", "From past you", "New note"]);
+    const kids = [...v.contentEl.children] as HTMLElement[];
+    const at = (pred: (e: HTMLElement) => boolean) => kids.findIndex(pred);
+    const bar = at((e) => e.classList.contains("pd-actions"));
+    const favs = at((e) => e.textContent!.startsWith("Favorites"));
+    const top = at((e) => e.classList.contains("pd-toprow"));
+    expect(bar).toBeGreaterThanOrEqual(0);
+    expect(favs).toBe(bar + 1);
+    expect(top).toBeGreaterThan(favs);
+    const tabs = [...listsBox(v).querySelectorAll(".pd-tab")].map((b: Element) => b.textContent);
+    expect(tabs[0]).toBe("Recently modified");
+    expect(tabs[1]).toMatch(/^Review Clipboard\d+$/);
     const text = v.contentEl.textContent!;
-    expect(text).not.toContain("Capture a thought");
-    expect(text).toContain("From past you");
-    expect(text).toContain("Dear future me");
+    expect(text).not.toContain("From the garden");
+    expect(text).not.toContain("Today's rhythm");
     expect(text).not.toContain("Next steps");
+    expect(text).not.toContain("Capture a thought");
+    expect(text).toContain("Dear future me");
     expect(text).toContain("Autumn market stall");
-    expect(text).toContain("From the garden");
   });
 
   it("New note has Work, Journal and Clipboard buttons, Clipboard chosen to start, and files under the one chosen", async () => {
@@ -166,30 +176,36 @@ describe("plugin smoke test", () => {
     expect(title.value).toBe("");
   });
 
-  it("Recently modified shows the last 10 files edited, newest first", async () => {
+  it("Recently modified is the first tab: the last 10 files edited, newest first, in a scrollable list", async () => {
     ctx.files.get("Dune.md")!.file.stat.mtime = Date.now() + 5000;
+    ctx.plugin.settings.homeTab = undefined;
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
-    const card = [...v.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.querySelector(".pd-card-title")?.textContent === "Recently modified") as HTMLElement;
-    expect(card).toBeTruthy();
-    const names = [...card.querySelectorAll(".pd-logrow-name")].map((e) => e.textContent);
+    expect(tab(v, "Recently modified").classList.contains("is-active")).toBe(true);
+    const names = [...listsBox(v).querySelectorAll(".pd-logrow-name")].map((e) => e.textContent);
     expect(names).toHaveLength(10);
     expect(names[0]).toBe("Dune");
-    expect(card.querySelector(".pd-scroll.pd-recent-scroll")).toBeTruthy();
+    expect(listsBox(v).querySelector(".pd-scroll.pd-recent-scroll")).toBeTruthy();
     expect(names).not.toContain("Sealed letter");
     expect(names).not.toContain("Old idea");
-    expect(v.contentEl.textContent).not.toContain("Recent logs");
   });
 
-  it("Review Clipboard lists clipboard notes and empty-category notes, newest first", async () => {
+  it("the Review Clipboard tab swaps the list in the same box, and the choice is remembered", async () => {
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
-    const card = [...v.contentEl.querySelectorAll(".pd-card")].find((c: Element) => c.querySelector(".pd-card-title")?.textContent === "Review Clipboard") as HTMLElement;
-    expect(card).toBeTruthy();
-    const names = [...card.querySelectorAll(".pd-logrow-name")].map((e) => e.textContent);
+    const box = listsBox(v);
+    tab(v, "Review Clipboard").click();
+    expect(tab(v, "Review Clipboard").classList.contains("is-active")).toBe(true);
+    expect(tab(v, "Recently modified").classList.contains("is-active")).toBe(false);
+    const names = [...box.querySelectorAll(".pd-logrow-name")].map((e) => e.textContent);
     expect(names.slice(0, 3)).toEqual(["Clip new", "No category either", "No category"]);
     expect(names).not.toContain("Pine & Plum");
     expect(names).not.toContain("Books");
-    expect(card.textContent).toContain("No category");
-    expect(card.textContent).toContain("Clipboard");
+    expect(box.textContent).toContain("No category");
+    expect(box.classList.contains("is-collapsed")).toBe(false);
+    expect(ctx.plugin.settings.homeTab).toBe("clipboard");
+    const again = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    expect(tab(again, "Review Clipboard").classList.contains("is-active")).toBe(true);
+    tab(again, "Recently modified").click();
+    expect(ctx.plugin.settings.homeTab).toBe("recent");
   });
 
   it("Home has no top button bar, and exactly the six shortcut buttons under the date", async () => {
@@ -229,10 +245,15 @@ describe("plugin smoke test", () => {
     expect(c2.classList.contains("is-collapsed")).toBe(true);
     (c2.querySelector(".pd-card-head") as HTMLElement).click();
     expect(ctx.plugin.settings.collapsedSections).not.toContain("favorites");
-    for (const title of ["Review Clipboard", "Recently modified", "From the garden"]) {
-      const c = [...again.contentEl.querySelectorAll(".pd-card")].find((x: Element) => x.querySelector(".pd-card-title")?.textContent === title) as HTMLElement;
-      expect(c.querySelector(".pd-card-head")!.classList.contains("is-collapsible"), title).toBe(true);
-    }
+    // The two-tab box folds from its title bar, but clicking a tab does not fold it.
+    const box = listsBox(again);
+    expect(box.querySelector(".pd-card-head")!.classList.contains("is-collapsible")).toBe(true);
+    tab(again, "Review Clipboard").click();
+    expect(box.classList.contains("is-collapsed")).toBe(false);
+    (box.querySelector(".pd-card-head") as HTMLElement).click();
+    expect(box.classList.contains("is-collapsed")).toBe(true);
+    (box.querySelector(".pd-card-head") as HTMLElement).click();
+    expect(ctx.plugin.settings.collapsedSections).not.toContain("lists");
   });
 
   it("Tasks lists newest first, with the created date and note title next to each other", async () => {

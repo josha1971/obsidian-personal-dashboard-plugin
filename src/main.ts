@@ -155,6 +155,12 @@ export default class DashboardPlugin extends Plugin {
     void this.saveData(this.settings);
   }
 
+  /** Remembers which Home list was last shown. Does not refresh anything. */
+  setHomeTab(tab: "recent" | "clipboard"): void {
+    this.settings.homeTab = tab;
+    void this.saveData(this.settings);
+  }
+
   /** Notes created or last edited on today's month and day in earlier years. */
   getOnThisDay(): { file: TFile; year: number; kind: "created" | "modified" | "both" }[] {
     const sealed = this.sealedPaths();

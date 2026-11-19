@@ -1,4 +1,4 @@
-import { WorkspaceLeaf, setTooltip } from "obsidian";
+import { TFile, WorkspaceLeaf, setTooltip } from "obsidian";
 import type DashboardPlugin from "../main";
 import { DashView } from "./base";
 import { VIEW_HOME } from "../constants";
@@ -6,7 +6,6 @@ import { friendlyDate, isoDate, isoWeek, startOfDay, timeAgo } from "../dates";
 import { readInbox } from "../store";
 import { NewNoteDraft, chip, iconButton, renderCaptureBox, renderNewNoteBox, sectionCard, starButton } from "../ui";
 import { letterExcerpt } from "./lookbackView";
-import { ago } from "./gardenView";
 
 export class HomeView extends DashView {
   private draft: NewNoteDraft = { title: "", text: "", category: "" };
@@ -52,6 +51,9 @@ export class HomeView extends DashView {
     iconButton(bar, "book-open", "Logs", () => void this.plugin.navigate(this.leaf, "logs"));
     iconButton(bar, "history", "Look Back", () => void this.plugin.navigate(this.leaf, "lookback"));
 
+    // Favorites sit right under the buttons
+    if (this.shown("favorites")) this.renderFavorites(el);
+
     // A letter from past you
     if (arrived.length) {
       const c = sectionCard(el, "From past you", arrived.length > 1 ? `${arrived.length} letters have arrived` : "a letter has arrived", "pd-tone-gold");
@@ -66,44 +68,58 @@ export class HomeView extends DashView {
       keep.addEventListener("click", () => void this.plugin.keepLetter(l.file));
     }
 
-    // Top row: New note, and the files edited most recently
+    // New note, beside one box with two lists (Recently modified, Review Clipboard)
     const top = el.createDiv({ cls: "pd-toprow" });
-    if (!this.shown("recentLogs")) top.addClass("is-single");
     const nn = sectionCard(top, "New note", "opens in a new tab", "pd-newnote").body;
     renderNewNoteBox(nn, this.plugin, this.draft);
-    if (this.shown("recentLogs")) this.renderRecent(top);
-
-    // Favorites
-    if (this.shown("favorites")) this.renderFavorites(el);
-
-    // Review Clipboard: new notes waiting for a proper category
-    if (this.shown("clipboard")) this.renderClipboard(el, today);
-
-    // From the garden
-    if (this.shown("garden")) {
-      const { picks, waiting } = this.plugin.gardenToday(3);
-      if (picks.length) {
-        const gc = sectionCard(el, "From the garden", `${waiting} waiting`, "pd-tone-green", { plugin: this.plugin, id: "garden" });
-        for (const f of picks) {
-          const row = gc.body.createDiv({ cls: "pd-logrow" });
-          row.createSpan({ text: f.basename, cls: "pd-logrow-name" }).addEventListener("click", () => void this.plugin.openFile(f));
-          row.createSpan({ text: `edited ${ago(f.stat.mtime)}`, cls: "pd-muted pd-logrow-date" });
-        }
-        const more = gc.body.createEl("button", { text: "See more in the Garden", cls: "pd-link" });
-        more.addEventListener("click", () => void this.plugin.navigate(this.leaf, "garden"));
-      }
-    }
+    if (!this.renderLists(top, today)) top.addClass("is-single");
   }
 
-  /** The last 10 files edited, in a box that scrolls. */
-  private renderRecent(parent: HTMLElement): void {
+  /**
+   * One box with two tabs: the last 10 files edited, and the notes waiting for a proper
+   * category. Clicking the title bar folds the box; the tabs do not. Returns false when both
+   * lists are switched off.
+   */
+  private renderLists(parent: HTMLElement, today: Date): boolean {
+    const s = this.plugin.settings;
+    const tabs: { id: "recent" | "clipboard"; label: string; count?: number }[] = [];
+    const clip = this.shown("clipboard") ? this.plugin.getClipboard() : [];
+    if (this.shown("recentLogs")) tabs.push({ id: "recent", label: "Recently modified" });
+    if (this.shown("clipboard")) tabs.push({ id: "clipboard", label: "Review Clipboard", count: clip.length });
+    if (!tabs.length) return false;
+
+    let active = tabs.some((t) => t.id === s.homeTab) ? s.homeTab! : tabs[0].id;
+    const { head, body } = sectionCard(parent, "", "", "pd-tone-green pd-lists", { plugin: this.plugin, id: "lists" });
+    head.querySelector(".pd-card-title")?.remove();
+    const bar = head.createDiv({ cls: "pd-tabs" });
+    const list = body.createDiv({ cls: "pd-scroll pd-recent-scroll" });
+    const buttons = new Map<string, HTMLButtonElement>();
+
+    const paint = () => {
+      for (const [id, b] of buttons) b.toggleClass("is-active", id === active);
+      list.empty();
+      if (active === "recent") this.fillRecent(list);
+      else this.fillClipboard(list, clip, today);
+    };
+    for (const t of tabs) {
+      const b = bar.createEl("button", { text: t.label, cls: "pd-tab" });
+      if (t.count) b.createSpan({ text: String(t.count), cls: "pd-tab-count" });
+      setTooltip(b, t.id === "recent" ? "The last 10 files you edited" : `Notes filed under ${s.clipboardCategory}, plus notes with an empty category, newest first`, { delay: 400 });
+      // The tabs switch lists; they do not fold the box.
+      b.addEventListener("click", (e) => { e.stopPropagation(); active = t.id; this.plugin.setHomeTab(t.id); paint(); });
+      b.addEventListener("keydown", (e) => e.stopPropagation());
+      buttons.set(t.id, b);
+    }
+    paint();
+    return true;
+  }
+
+  private fillRecent(list: HTMLElement): void {
     const recent = this.plugin.getRecentlyModified(10);
-    const rl = sectionCard(parent, "Recently modified", recent.length ? `last ${recent.length}` : "", "pd-tone-green", { plugin: this.plugin, id: "recent" });
     if (!recent.length) {
-      rl.body.createDiv({ cls: "pd-empty", text: "No notes yet." });
+      list.createDiv({ cls: "pd-empty", text: "No notes yet." });
       return;
     }
-    const list = rl.body.createDiv({ cls: "pd-scroll pd-recent-scroll" });
     for (const f of recent) {
       const row = list.createDiv({ cls: "pd-logrow" });
       const name = row.createSpan({ text: f.basename, cls: "pd-logrow-name" });
@@ -117,15 +133,12 @@ export class HomeView extends DashView {
     }
   }
 
-  private renderClipboard(parent: HTMLElement, today: Date): void {
-    const items = this.plugin.getClipboard();
+  private fillClipboard(list: HTMLElement, items: { file: TFile; created: number; unassigned: boolean }[], today: Date): void {
     const name = this.plugin.settings.clipboardCategory;
-    const card = sectionCard(parent, "Review Clipboard", items.length ? `${items.length} ${items.length === 1 ? "note" : "notes"} · newest first` : "", "pd-tone-red", { plugin: this.plugin, id: "clipboard" });
     if (!items.length) {
-      card.body.createDiv({ cls: "pd-empty", text: `Nothing to review. Notes made from New note are filed under ${name}, and notes with an empty category show up here too.` });
+      list.createDiv({ cls: "pd-empty", text: `Nothing to review. Notes made from New note are filed under ${name}, and notes with an empty category show up here too.` });
       return;
     }
-    const list = card.body.createDiv({ cls: "pd-scroll" });
     for (const it of items) {
       const row = list.createDiv({ cls: "pd-logrow" });
       const title = row.createSpan({ text: it.file.basename, cls: "pd-logrow-name" });
