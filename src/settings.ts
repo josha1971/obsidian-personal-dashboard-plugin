@@ -22,6 +22,8 @@ export interface DashboardSettings {
   writeCategory: string;
   /** Todos added from the Todos tab on Home are written into this note. */
   todoNotePath: string;
+  /** The Wishlist tab reads and writes only this note. Its todos are kept out of Tasks and the Todos tab. */
+  wishlistNotePath: string;
   /** Notes made from Home are filed here, and Home lists them (plus notes with an empty category) for review. */
   clipboardCategory: string;
   /** The category buttons on the New note box (the clipboard category is always among them). */
@@ -42,7 +44,7 @@ export interface DashboardSettings {
   /** Sections the user folded shut (by id), so they stay shut. */
   collapsedSections: string[];
   /** Which list the Home box shows. */
-  homeTab?: "recent" | "clipboard" | "todos";
+  homeTab?: "recent" | "clipboard" | "todos" | "wishlist";
   /** The Library's last layout, category and grouping, so it opens the way you left it. */
   libraryState?: { category: string; groupKey: string; dateKey: string; layout: "list" | "board" | "calendar" };
   /** One-time changes already applied to saved settings. */
@@ -63,6 +65,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   writeCategory: "Writing",
   clipboardCategory: "Clipboard",
   todoNotePath: "00. PRIMARY FOLDER/On The Fly Todo List.md",
+  wishlistNotePath: "00. PRIMARY FOLDER/Wishlist.md",
   newNoteCategories: ["Work", "Journal", "Clipboard"],
   quickThoughtFolder: "Quick Thoughts",
   quickThoughtCategory: "Quick Thought",
@@ -81,6 +84,7 @@ export const HOME_SECTIONS: [string, string][] = [
   ["clipboard", "Review Clipboard tab"],
   ["recentLogs", "Recently modified tab"],
   ["todos", "Todos tab"],
+  ["wishlist", "Wishlist tab"],
 ];
 
 export class DashboardSettingTab extends PluginSettingTab {
@@ -146,6 +150,10 @@ export class DashboardSettingTab extends PluginSettingTab {
       .setName("On-the-fly todo note")
       .setDesc("Todos you add from the Todos tab on Home are written into this note, at the bottom. It is created if it does not exist.")
       .addText((t) => t.setValue(s.todoNotePath).onChange(async (v) => { s.todoNotePath = v.trim() || DEFAULT_SETTINGS.todoNotePath; await save(); }));
+    new Setting(containerEl)
+      .setName("Wishlist note")
+      .setDesc("The Wishlist tab on Home reads and writes only this note. Todos in it are left out of the Tasks page, the Todos tab and Mark all done.")
+      .addText((t) => t.setValue(s.wishlistNotePath).onChange(async (v) => { s.wishlistNotePath = v.trim() || DEFAULT_SETTINGS.wishlistNotePath; await save(); }));
     new Setting(containerEl)
       .setName("Quick Thoughts folder")
       .setDesc("Add Quick Thought saves notes here. See all Quick Thoughts opens the note called All Quick Thoughts inside it.")

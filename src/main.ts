@@ -156,7 +156,7 @@ export default class DashboardPlugin extends Plugin {
   }
 
   /** Remembers which Home list was last shown. Does not refresh anything. */
-  setHomeTab(tab: "recent" | "clipboard" | "todos"): void {
+  setHomeTab(tab: "recent" | "clipboard" | "todos" | "wishlist"): void {
     this.settings.homeTab = tab;
     void this.saveData(this.settings);
   }
@@ -272,10 +272,25 @@ export default class DashboardPlugin extends Plugin {
     return (this.favCache ??= collectFavorites(this.app, this.settings)).filter((f) => !sealed.has(f.file.path));
   }
 
-  async getTasks(): Promise<TaskItem[]> {
+  /** Every checkbox in the vault, wishlist included. Used by Search and Review. */
+  async getAllTasks(): Promise<TaskItem[]> {
     if (!this.taskCache) this.taskCache = await collectTasks(this.app, this.settings);
     const sealed = this.sealedPaths();
     return sealed.size ? this.taskCache.filter((t) => !sealed.has(t.file.path)) : this.taskCache;
+  }
+
+  private isWishlist(file: TFile): boolean {
+    return file.path === normalizePath(this.settings.wishlistNotePath);
+  }
+
+  /** The todos for the Tasks page and the Todos tab: everything except what is in the Wishlist note. */
+  async getTasks(): Promise<TaskItem[]> {
+    return (await this.getAllTasks()).filter((t) => !this.isWishlist(t.file));
+  }
+
+  /** Only the todos that live in the Wishlist note. */
+  async getWishlistTasks(): Promise<TaskItem[]> {
+    return (await this.getAllTasks()).filter((t) => this.isWishlist(t.file));
   }
 
   /** Letters to future you that have not arrived yet. The dashboard never shows their text. */
@@ -460,13 +475,13 @@ export default class DashboardPlugin extends Plugin {
     }
   }
 
-  /** Adds an open todo to the on-the-fly todo note (at the bottom), dated today. Returns true if it was added. */
-  async addTodo(input: string): Promise<boolean> {
+  /** Adds an open todo to a note (at the bottom), dated today. Defaults to the on-the-fly todo note. Returns true if it was added. */
+  async addTodo(input: string, notePath: string = this.settings.todoNotePath): Promise<boolean> {
     const text = input.trim().replace(/\s+/g, " ");
     if (!text) return false;
     const line = `- [ ] ${text} ➕ ${isoDate(new Date())}`;
     try {
-      const file = await appendToPath(this.app, this.settings.todoNotePath, line, "bottom");
+      const file = await appendToPath(this.app, notePath, line, "bottom");
       undoNotice(`Added to ${file.basename}.`, async () => {
         if (!(await removeLine(this.app, file, line))) throw new Error("the line has changed since");
       });

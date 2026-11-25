@@ -10,6 +10,7 @@ import { letterExcerpt } from "./lookbackView";
 export class HomeView extends DashView {
   private draft: NewNoteDraft = { title: "", text: "", category: "" };
   private todoDraft = "";
+  private wishDraft = "";
   private refocusTodo = false;
 
   constructor(leaf: WorkspaceLeaf, plugin: DashboardPlugin) {
@@ -25,7 +26,8 @@ export class HomeView extends DashView {
 
   protected async render(isCurrent: () => boolean): Promise<void> {
     const s = this.plugin.settings;
-    const [inbox, tasks] = await Promise.all([readInbox(this.app, s), this.shown("todos") ? this.plugin.getTasks() : Promise.resolve([] as TaskItem[])]);
+    const none = Promise.resolve([] as TaskItem[]);
+    const [inbox, tasks, wishes] = await Promise.all([readInbox(this.app, s), this.shown("todos") ? this.plugin.getTasks() : none, this.shown("wishlist") ? this.plugin.getWishlistTasks() : none]);
     const today = startOfDay(new Date());
     const todayIso = isoDate(today);
 
@@ -74,7 +76,7 @@ export class HomeView extends DashView {
     const top = el.createDiv({ cls: "pd-toprow" });
     const nn = sectionCard(top, "New note", "opens in a new tab", "pd-newnote").body;
     renderNewNoteBox(nn, this.plugin, this.draft);
-    if (!this.renderLists(top, today, tasks)) top.addClass("is-single");
+    if (!this.renderLists(top, today, tasks, wishes)) top.addClass("is-single");
   }
 
   /**
@@ -82,18 +84,22 @@ export class HomeView extends DashView {
    * category. Clicking the title bar folds the box; the tabs do not. Returns false when both
    * lists are switched off.
    */
-  private renderLists(parent: HTMLElement, today: Date, tasks: TaskItem[]): boolean {
+  private renderLists(parent: HTMLElement, today: Date, tasks: TaskItem[], wishes: TaskItem[]): boolean {
     const s = this.plugin.settings;
-    type Tab = "recent" | "clipboard" | "todos";
+    type Tab = "recent" | "clipboard" | "todos" | "wishlist";
     const tabs: { id: Tab; label: string; count?: number }[] = [];
     const clip = this.shown("clipboard") ? this.plugin.getClipboard() : [];
     // Open todos, oldest first.
-    const todos = tasks
-      .filter((t) => t.info.state === "open")
-      .sort((a, b) => taskCreatedKey(a).localeCompare(taskCreatedKey(b)) || a.file.path.localeCompare(b.file.path) || a.line - b.line);
+    const oldestFirst = (list: TaskItem[]) =>
+      list
+        .filter((t) => t.info.state === "open")
+        .sort((a, b) => taskCreatedKey(a).localeCompare(taskCreatedKey(b)) || a.file.path.localeCompare(b.file.path) || a.line - b.line);
+    const todos = oldestFirst(tasks);
+    const wishlist = oldestFirst(wishes);
     if (this.shown("recentLogs")) tabs.push({ id: "recent", label: "Recently modified" });
     if (this.shown("clipboard")) tabs.push({ id: "clipboard", label: "Review Clipboard", count: clip.length });
     if (this.shown("todos")) tabs.push({ id: "todos", label: "Todos", count: todos.length });
+    if (this.shown("wishlist")) tabs.push({ id: "wishlist", label: "Wishlist", count: wishlist.length });
     if (!tabs.length) return false;
 
     let active: Tab = tabs.some((t) => t.id === s.homeTab) ? s.homeTab! : tabs[0].id;
@@ -110,12 +116,14 @@ export class HomeView extends DashView {
       list.empty();
       if (active === "recent") this.fillRecent(list);
       else if (active === "clipboard") this.fillClipboard(list, clip, today);
-      else this.fillTodos(extra, list, todos, today);
+      else if (active === "todos") this.fillTodos(extra, list, todos, today, "todos");
+      else this.fillTodos(extra, list, wishlist, today, "wishlist");
     };
     const tips: Record<Tab, string> = {
       recent: "The last 10 files you edited",
       clipboard: `Notes filed under ${s.clipboardCategory}, plus notes with an empty category, newest first`,
-      todos: "Every open checkbox in your vault, oldest first. Add new ones here.",
+      todos: "Every open checkbox in your vault except the Wishlist, oldest first. Add new ones here.",
+      wishlist: `Only the todos in ${s.wishlistNotePath}, oldest first. Add new ones here.`,
     };
     for (const t of tabs) {
       const b = bar.createEl("button", { text: t.label, cls: "pd-tab" });
@@ -130,28 +138,31 @@ export class HomeView extends DashView {
     return true;
   }
 
-  /** The Todos tab: a quick-add field, then every open todo, oldest first. */
-  private fillTodos(extra: HTMLElement, list: HTMLElement, todos: TaskItem[], today: Date): void {
+  /** A todo tab: a quick-add field, then the open todos, oldest first. Todos and Wishlist share this. */
+  private fillTodos(extra: HTMLElement, list: HTMLElement, todos: TaskItem[], today: Date, kind: "todos" | "wishlist"): void {
+    const s = this.plugin.settings;
+    const notePath = kind === "wishlist" ? s.wishlistNotePath : s.todoNotePath;
     const row = extra.createDiv({ cls: "pd-todo-add" });
-    const input = row.createEl("input", { type: "text", cls: "pd-input", attr: { placeholder: "Add a todo" } });
-    input.value = this.todoDraft;
-    setTooltip(input, `Adds an open todo to the bottom of ${this.plugin.settings.todoNotePath} (Enter)`, { delay: 500 });
+    const input = row.createEl("input", { type: "text", cls: "pd-input", attr: { placeholder: kind === "wishlist" ? "Add to wishlist" : "Add a todo" } });
+    input.value = kind === "wishlist" ? this.wishDraft : this.todoDraft;
+    setTooltip(input, `Adds an open todo to the bottom of ${notePath} (Enter)`, { delay: 500 });
     const add = row.createEl("button", { text: "Add", cls: "pd-btn mod-cta" });
+    const setDraft = (v: string) => { if (kind === "wishlist") this.wishDraft = v; else this.todoDraft = v; };
     const submit = async () => {
       const text = input.value;
       if (!text.trim()) return;
-      this.todoDraft = "";
+      setDraft("");
       this.refocusTodo = true;
-      if (await this.plugin.addTodo(text)) input.value = "";
-      else { this.todoDraft = text; this.refocusTodo = false; }
+      if (await this.plugin.addTodo(text, notePath)) input.value = "";
+      else { setDraft(text); this.refocusTodo = false; }
     };
-    input.addEventListener("input", () => { this.todoDraft = input.value; });
+    input.addEventListener("input", () => setDraft(input.value));
     input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); void submit(); } });
     add.addEventListener("click", () => void submit());
     if (this.refocusTodo) { this.refocusTodo = false; window.setTimeout(() => input.focus(), 30); }
 
     if (!todos.length) {
-      list.createDiv({ cls: "pd-empty", text: "No open todos. Add one above." });
+      list.createDiv({ cls: "pd-empty", text: kind === "wishlist" ? "Nothing on the wishlist. Add something above." : "No open todos. Add one above." });
       return;
     }
     for (const t of todos) renderTaskRow(list, t, this.plugin, today, true);

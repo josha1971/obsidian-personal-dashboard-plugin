@@ -70,7 +70,7 @@ export class SearchView extends DashView {
     const today = startOfDay(new Date());
 
     if (this.where === "all" || this.where === "tasks") {
-      const tasks: TaskItem[] = (await this.plugin.getTasks()).filter((x) => x.info.state !== "cancelled" && matches(`${x.info.text} ${x.file.basename}`));
+      const tasks: TaskItem[] = (await this.plugin.getAllTasks()).filter((x) => x.info.state !== "cancelled" && matches(`${x.info.text} ${x.file.basename}`));
       if (id !== this.runId) return;
       if (tasks.length) {
         const c = sectionCard(box, "Tasks", `${tasks.length}`, "pd-tone-red");

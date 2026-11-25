@@ -21,11 +21,11 @@ export class ReviewView extends DashView {
   private async gather(r: WeekRange): Promise<ReviewData> {
     const s = this.plugin.settings;
     const logs = this.plugin.getLogs().filter((l) => inRange(l.date, r)).sort((a, b) => a.date.localeCompare(b.date));
-    const tasks = (await this.plugin.getTasks()).filter((t) => t.info.state === "done" && inRange(t.info.doneDate, r));
+    const tasks = (await this.plugin.getAllTasks()).filter((t) => t.info.state === "done" && inRange(t.info.doneDate, r));
     const inbox = await readInbox(this.app, s);
     const captured = inbox.filter((i) => inRange(i.added, r)).length;
     // Items already moved out of the inbox still count when they are tasks that were created this week.
-    const createdTasks = (await this.plugin.getTasks()).filter((t) => inRange(t.info.created, r) && t.file.path !== this.plugin.settings.inboxPath).length;
+    const createdTasks = (await this.plugin.getAllTasks()).filter((t) => inRange(t.info.created, r) && t.file.path !== this.plugin.settings.inboxPath).length;
     let notesCreated = 0;
     for (const f of this.app.vault.getMarkdownFiles()) {
       const fm = this.app.metadataCache.getFileCache(f)?.frontmatter;

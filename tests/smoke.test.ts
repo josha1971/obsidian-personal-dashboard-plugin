@@ -82,6 +82,7 @@ async function setup() {
   add("Task list notes.md", "- [ ] Older task ➕ 2025-01-01\n- [ ] Newer task ➕ 2026-11-01\n", { created: "2024-05-05T10:00:00" });
   const lastYear = new Date(new Date().getFullYear() - 1, new Date().getMonth(), new Date().getDate(), 12, 0);
   add("Anniversary note.md", "from a year ago " + "x".repeat(300), { created: isoDate(lastYear) + "T12:00:00" }, Math.round((Date.now() - lastYear.getTime()) / DAY));
+  add("00. PRIMARY FOLDER/Wishlist.md", "- [ ] New lens ➕ 2026-01-05\n- [ ] Standing desk ➕ 2026-01-02\n- [x] Bought boots ✅ 2026-02-01\n");
   add("Whiteboard.canvas", "{}");
   add("Categories/Books.md", "category page", { tags: "categories" });
   app.metadataCache.resolvedLinks = { "Pine & Plum.md": { "Plans/Autumn market stall.md": 1 }, "Taco Place.md": { "Plans/Autumn market stall.md": 1 } };
@@ -131,6 +132,7 @@ describe("plugin smoke test", () => {
     expect(tabs[0]).toBe("Recently modified");
     expect(tabs[1]).toMatch(/^Review Clipboard\d+$/);
     expect(tabs[2]).toMatch(/^Todos\d+$/);
+    expect(tabs[3]).toMatch(/^Wishlist\d+$/);
     const text = v.contentEl.textContent!;
     expect(text).not.toContain("From the garden");
     expect(text).not.toContain("Today's rhythm");
@@ -238,6 +240,34 @@ describe("plugin smoke test", () => {
     const after = [...listsBox(again).querySelectorAll(".pd-task-text")].map((e) => e.textContent);
     expect(after.indexOf("Renew passport")).toBeLessThan(after.indexOf("Book dentist"));
     expect(after.indexOf("Book dentist")).toBe(after.length - 1);
+    ctx.plugin.settings.homeTab = "recent";
+  });
+
+  it("Wishlist todos are kept out of Tasks and the Todos tab, and shown only on the Wishlist tab", async () => {
+    const tasksPage = await render(ctx.plugin, ctx.app, "personal-dashboard-tasks");
+    tasksPage.status = "all";
+    expect(tasksPage.contentEl.textContent).not.toContain("New lens");
+    expect(tasksPage.contentEl.textContent).not.toContain("Standing desk");
+
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    tab(v, "Todos").click();
+    expect(listsBox(v).textContent).not.toContain("New lens");
+    tab(v, "Wishlist").click();
+    const box = listsBox(v);
+    const texts = [...box.querySelectorAll(".pd-task-text")].map((e) => e.textContent);
+    expect(texts).toEqual(["Standing desk", "New lens"]); // oldest first, open only
+    expect(box.querySelector(".pd-todo-add input")!.getAttribute("placeholder")).toBe("Add to wishlist");
+    expect(tab(v, "Wishlist").querySelector(".pd-tab-count")!.textContent).toBe("2");
+
+    // Adding goes only to Wishlist.md, at the bottom.
+    expect(await ctx.plugin.addTodo("Fuji lens cap", ctx.plugin.settings.wishlistNotePath)).toBe(true);
+    const wish = ctx.files.get("00. PRIMARY FOLDER/Wishlist.md")!.content.split("\n");
+    expect(wish.filter(Boolean).pop()).toMatch(/^- \[ \] Fuji lens cap ➕ \d{4}/);
+    expect(ctx.files.get("00. PRIMARY FOLDER/On The Fly Todo List.md")!.content).not.toContain("Fuji lens cap");
+
+    // Search and Review still see everything.
+    expect((await ctx.plugin.getAllTasks()).some((t) => t.info.text === "New lens")).toBe(true);
+    expect((await ctx.plugin.getTasks()).some((t) => t.info.text === "New lens")).toBe(false);
     ctx.plugin.settings.homeTab = "recent";
   });
 
@@ -537,10 +567,13 @@ describe("plugin smoke test", () => {
     ([...(Modal.last as any).contentEl.querySelectorAll("button")].find((b: Element) => b.classList.contains("mod-warning")) as HTMLElement).click();
     await new Promise((r) => setTimeout(r, 50));
     for (const [path, fx] of ctx.files) {
-      if (path.startsWith("Categories/")) continue;
+      if (path.startsWith("Categories/") || path === "00. PRIMARY FOLDER/Wishlist.md") continue;
       expect(fx.content, path).not.toMatch(/^\s*[-*] \[ \]/m);
     }
     expect(ctx.files.get("Bulk B.md")!.content).toMatch(/^- \[x\] b one ✅ \d{4}/);
+    // The wishlist is not part of "all todos", so it is left exactly as it was.
+    expect(ctx.files.get("00. PRIMARY FOLDER/Wishlist.md")!.content).toMatch(/- \[ \] New lens/);
+    expect(ctx.files.get("00. PRIMARY FOLDER/Wishlist.md")!.content).toMatch(/- \[ \] Standing desk/);
   });
 
   it("no unexpected error notices were shown", () => {
