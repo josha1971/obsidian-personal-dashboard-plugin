@@ -504,6 +504,60 @@ export default class DashboardPlugin extends Plugin {
     return this.createNote(filename, content);
   }
 
+  /**
+   * Marks the given open tasks done, with today's done date. Lines are checked before they are
+   * changed; a task whose line has moved or changed is skipped. Returns how many were changed
+   * and a function that puts every one of them back.
+   */
+  async completeTasks(items: TaskItem[]): Promise<{ count: number; notes: number; undo: () => Promise<void> }> {
+    const now = new Date();
+    const norm = (x: string) => x.replace(/\r$/, "");
+    const byFile = new Map<TFile, TaskItem[]>();
+    for (const t of items) {
+      if (t.info.state !== "open") continue;
+      if (!byFile.has(t.file)) byFile.set(t.file, []);
+      byFile.get(t.file)!.push(t);
+    }
+    const changes: { file: TFile; before: string; after: string }[] = [];
+    for (const [file, tasks] of byFile) {
+      tasks.sort((a, b) => a.line - b.line);
+      await this.app.vault.process(file, (data) => {
+        const lines = data.split("\n");
+        const used = new Set<number>();
+        for (const t of tasks) {
+          let idx = !used.has(t.line) && norm(lines[t.line] ?? "") === t.raw ? t.line : lines.findIndex((l, i) => !used.has(i) && norm(l) === t.raw);
+          if (idx < 0) continue;
+          const before = lines[idx];
+          const after = toggleLine(before, now);
+          if (after === before) continue;
+          lines[idx] = after;
+          used.add(idx);
+          changes.push({ file, before, after });
+        }
+        return lines.join("\n");
+      });
+    }
+    const undo = async () => {
+      const back = new Map<TFile, { before: string; after: string }[]>();
+      for (const c of changes) {
+        if (!back.has(c.file)) back.set(c.file, []);
+        back.get(c.file)!.push(c);
+      }
+      for (const [file, list] of back) {
+        await this.app.vault.process(file, (data) => {
+          const lines = data.split("\n");
+          const used = new Set<number>();
+          for (const c of list) {
+            const idx = lines.findIndex((l, i) => !used.has(i) && l === c.after);
+            if (idx >= 0) { lines[idx] = c.before; used.add(idx); }
+          }
+          return lines.join("\n");
+        });
+      }
+    };
+    return { count: changes.length, notes: new Set(changes.map((c) => c.file)).size, undo };
+  }
+
   /** Ticks or unticks one task line, checking that the line is still where we expect. */
   async toggleTask(t: TaskItem): Promise<void> {
     const now = new Date();

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeAll, describe, expect, it } from "vitest";
-import { Notice, TFile, installDomHelpers } from "./obsidian-mock";
+import { Modal, Notice, TFile, installDomHelpers } from "./obsidian-mock";
 import DashboardPlugin from "../src/main";
 import { addDays, isoDate } from "../src/dates";
 import { LogModal, QuickThoughtModal } from "../src/modals";
@@ -488,6 +488,59 @@ describe("plugin smoke test", () => {
     expect(again.settings.logTypes.find((t) => t.id === "cooked")!.fields.find((f) => f.key === "source")!.suggest).toBe(true);
     // Other fields keep their suggestions.
     expect(plugin.settings.logTypes.find((t) => t.id === "place")!.fields.find((f) => f.key === "area")!.suggest).toBe(true);
+  });
+
+  it("Mark all done: completes a set of todos and one Undo restores every line exactly, duplicates included", async () => {
+    ctx.add("Bulk A.md", "intro\n- [ ] same thing\n- [ ] same thing\n- [/] in progress\n- [x] already done ✅ 2026-01-01\n- [ ] last one\r\n");
+    ctx.add("Bulk B.md", "- [ ] b one\n");
+    const original = { a: ctx.files.get("Bulk A.md")!.content, b: ctx.files.get("Bulk B.md")!.content };
+    ctx.plugin.invalidate();
+    const items = (await ctx.plugin.getTasks()).filter((t) => t.file.basename.startsWith("Bulk "));
+    const res = await ctx.plugin.completeTasks(items);
+    expect(res).toMatchObject({ count: 5, notes: 2 });
+    const a = ctx.files.get("Bulk A.md")!.content;
+    expect(a.match(/\[x\] same thing ✅ \d{4}-\d{2}-\d{2}/g)).toHaveLength(2);
+    expect(a).toMatch(/\[x\] in progress ✅/);
+    expect(a).toContain("- [x] already done ✅ 2026-01-01\n"); // untouched
+    expect(a).toMatch(/- \[x\] last one ✅ \d{4}-\d{2}-\d{2}\r\n/); // line ending kept
+    expect(a).not.toMatch(/\[ \]/);
+    await res.undo();
+    expect(ctx.files.get("Bulk A.md")!.content).toBe(original.a);
+    expect(ctx.files.get("Bulk B.md")!.content).toBe(original.b);
+  });
+
+  it("Mark all done skips a todo whose line changed since the list loaded", async () => {
+    ctx.plugin.invalidate();
+    const items = (await ctx.plugin.getTasks()).filter((t) => t.file.basename === "Bulk B");
+    ctx.files.get("Bulk B.md")!.content = "- [ ] b one, edited\n";
+    const res = await ctx.plugin.completeTasks(items);
+    expect(res.count).toBe(0);
+    expect(ctx.files.get("Bulk B.md")!.content).toBe("- [ ] b one, edited\n");
+  });
+
+  it("the Tasks page button asks first, Cancel changes nothing, and confirming completes what is listed", async () => {
+    ctx.files.get("Bulk B.md")!.content = "- [ ] b one\n";
+    ctx.plugin.invalidate();
+    const snapshot = () => JSON.stringify([...ctx.files.entries()].map(([k, v]) => [k, v.content]));
+    const before = snapshot();
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-tasks");
+    const btn = [...v.contentEl.querySelectorAll(".pd-page-head button")].find((b: Element) => b.textContent === "Mark all done") as HTMLElement;
+    expect(btn).toBeTruthy();
+    btn.click();
+    const modal = Modal.last as any;
+    expect(modal.titleEl.textContent).toMatch(/^Mark \d+ todos as done\?$/);
+    expect(snapshot()).toBe(before); // nothing yet
+    ([...modal.contentEl.querySelectorAll("button")].find((b: Element) => b.textContent === "Cancel") as HTMLElement).click();
+    expect(snapshot()).toBe(before);
+
+    btn.click();
+    ([...(Modal.last as any).contentEl.querySelectorAll("button")].find((b: Element) => b.classList.contains("mod-warning")) as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 50));
+    for (const [path, fx] of ctx.files) {
+      if (path.startsWith("Categories/")) continue;
+      expect(fx.content, path).not.toMatch(/^\s*[-*] \[ \]/m);
+    }
+    expect(ctx.files.get("Bulk B.md")!.content).toMatch(/^- \[x\] b one ✅ \d{4}/);
   });
 
   it("no unexpected error notices were shown", () => {

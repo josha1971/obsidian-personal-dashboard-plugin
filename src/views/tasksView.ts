@@ -1,10 +1,11 @@
-import { WorkspaceLeaf, setTooltip } from "obsidian";
+import { Notice, WorkspaceLeaf, setTooltip } from "obsidian";
 import type DashboardPlugin from "../main";
 import { DashView } from "./base";
 import { VIEW_TASKS } from "../constants";
 import { daysBetween, parseISODate, startOfDay } from "../dates";
 import { TaskItem, asList, linkTarget, taskCreatedKey } from "../store";
-import { renderTaskRow } from "../ui";
+import { iconButton, renderTaskRow, undoNotice } from "../ui";
+import { ConfirmModal } from "../modals";
 
 type Status = "open" | "done" | "all";
 type DueFilter = "any" | "overdue" | "today" | "week" | "none";
@@ -51,11 +52,36 @@ export class TasksView extends DashView {
     const t = head.createDiv();
     t.createDiv({ cls: "pd-kicker", text: "Every checkbox in your vault" });
     t.createEl("h1", { cls: "pd-title", text: "Tasks" });
+    const done = iconButton(head, "check-check", "Mark all done", () => this.confirmCompleteAll());
+    setTooltip(done, "Marks every open todo in the list below as done, after you confirm. One Undo puts them all back", { delay: 300 });
 
     this.renderControls(el);
     this.summaryEl = el.createDiv({ cls: "pd-muted pd-summary" });
     this.listEl = el.createDiv({ cls: "pd-tasklist" });
     this.renderList();
+  }
+
+  /** Asks first, then marks every open todo currently listed as done. With no filters that is every open todo in the vault. */
+  private confirmCompleteAll(): void {
+    const open = this.filtered(startOfDay(new Date())).filter((x) => x.info.state === "open");
+    if (!open.length) {
+      new Notice("There are no open todos in this list.");
+      return;
+    }
+    const notes = new Set(open.map((x) => x.file.path)).size;
+    new ConfirmModal(this.app, {
+      title: `Mark ${open.length} ${open.length === 1 ? "todo" : "todos"} as done?`,
+      lines: [
+        `${open.length} open ${open.length === 1 ? "todo" : "todos"} in ${notes} ${notes === 1 ? "note" : "notes"} will be ticked off and given today's done date. This is exactly the ${open.length === 1 ? "todo" : "list"} shown below, so any filters you set apply.`,
+        "Only the checkbox lines change. Afterwards there is one Undo that puts them all back.",
+      ],
+      confirm: `Mark ${open.length} as done`,
+      onConfirm: async () => {
+        const res = await this.plugin.completeTasks(open);
+        if (!res.count) { new Notice("Nothing changed. The notes may have been edited since the list loaded."); return; }
+        undoNotice(`Marked ${res.count} ${res.count === 1 ? "todo" : "todos"} as done in ${res.notes} ${res.notes === 1 ? "note" : "notes"}.`, res.undo, 20000);
+      },
+    }).open();
   }
 
   private renderControls(parent: HTMLElement): void {

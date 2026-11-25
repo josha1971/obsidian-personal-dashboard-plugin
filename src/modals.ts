@@ -336,3 +336,28 @@ export class LogModal extends Modal {
     }
   }
 }
+
+/** A yes/no question before something that changes many notes. Nothing happens until you confirm. */
+export class ConfirmModal extends Modal {
+  constructor(app: App, private opts: { title: string; lines: string[]; confirm: string; onConfirm: () => Promise<void> | void }) {
+    super(app);
+  }
+  onOpen(): void {
+    this.modalEl.addClass("pd-modal");
+    this.titleEl.setText(this.opts.title);
+    for (const l of this.opts.lines) this.contentEl.createDiv({ text: l, cls: "pd-confirm-line" });
+    const foot = this.contentEl.createDiv({ cls: "pd-footer" });
+    const go = foot.createEl("button", { text: this.opts.confirm, cls: "pd-btn mod-warning" });
+    const cancel = foot.createEl("button", { text: "Cancel", cls: "pd-btn" });
+    cancel.addEventListener("click", () => this.close());
+    go.addEventListener("click", async () => {
+      go.disabled = true;
+      this.close();
+      await this.opts.onConfirm();
+    });
+    window.setTimeout(() => cancel.focus(), 30);
+  }
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}

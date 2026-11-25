@@ -82,7 +82,8 @@ export class Modal {
   contentEl = document.createElement("div"); modalEl = document.createElement("div"); titleEl = document.createElement("div");
   scope = { register() {} };
   constructor(public app: any) {}
-  open() { (this as any).onOpen(); }
+  static last: Modal | null = null;
+  open() { Modal.last = this; (this as any).onOpen(); }
   close() { (this as any).onClose(); }
 }
 

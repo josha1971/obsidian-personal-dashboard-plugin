@@ -274,3 +274,5 @@
 .pd-task-meta { column-gap: 0; }
 .pd-task-meta > * { margin-right: 6px; }
 .pd-task-meta .pd-task-when { white-space: pre; margin-right: 0; }
+
+.pd-confirm-line { margin: 6px 0; }
