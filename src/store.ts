@@ -219,16 +219,22 @@ export async function createUniqueNote(app: App, folder: string, filename: strin
   return app.vault.create(path, content);
 }
 
-export async function appendLine(app: App, settings: DashboardSettings, line: string): Promise<TFile> {
-  const path = normalizePath(settings.inboxPath);
+/** Adds a line to a note, creating the note (and its folder) if it is missing. */
+export async function appendToPath(app: App, notePath: string, line: string, position: "top" | "bottom"): Promise<TFile> {
+  const path = normalizePath(notePath);
   const existing = app.vault.getAbstractFileByPath(path);
   if (existing instanceof TFile) {
-    await app.vault.process(existing, (data) => insertCaptureLine(data, line, "top"));
+    await app.vault.process(existing, (data) => insertCaptureLine(data, line, position));
     return existing;
   }
   const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
   await ensureFolder(app, folder);
   return app.vault.create(path, line + "\n");
+}
+
+/** The inbox note (your Random Notes): new lines go at the top. */
+export function appendLine(app: App, settings: DashboardSettings, line: string): Promise<TFile> {
+  return appendToPath(app, settings.inboxPath, line, "top");
 }
 
 /** Removes the last exact copy of a line (used by Undo). Returns whether it was found. */

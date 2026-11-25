@@ -13,7 +13,7 @@ import { OverviewView } from "./views/overviewView";
 import { TasksView } from "./views/tasksView";
 import { LogsView } from "./views/logsView";
 import { CaptureModal, LogModal, QuickThoughtModal } from "./modals";
-import { CatNote, FavoriteItem, LogEntry, TaskItem, appendLine, collectFavorites, collectLogs, isExcluded, linkTarget, noteDate, notesInCategory, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
+import { CatNote, FavoriteItem, LogEntry, TaskItem, appendLine, appendToPath, collectFavorites, collectLogs, isExcluded, linkTarget, noteDate, notesInCategory, collectTasks, createUniqueNote, inboxFile, removeLine } from "./store";
 import { toggleLine } from "./tasks";
 import { buildQuickNote, buildQuickThought } from "./notes";
 import { LogType } from "./logs";
@@ -156,7 +156,7 @@ export default class DashboardPlugin extends Plugin {
   }
 
   /** Remembers which Home list was last shown. Does not refresh anything. */
-  setHomeTab(tab: "recent" | "clipboard"): void {
+  setHomeTab(tab: "recent" | "clipboard" | "todos"): void {
     this.settings.homeTab = tab;
     void this.saveData(this.settings);
   }
@@ -456,6 +456,23 @@ export default class DashboardPlugin extends Plugin {
       return true;
     } catch (e) {
       new Notice(`Could not add it: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
+  /** Adds an open todo to the on-the-fly todo note (at the bottom), dated today. Returns true if it was added. */
+  async addTodo(input: string): Promise<boolean> {
+    const text = input.trim().replace(/\s+/g, " ");
+    if (!text) return false;
+    const line = `- [ ] ${text} ➕ ${isoDate(new Date())}`;
+    try {
+      const file = await appendToPath(this.app, this.settings.todoNotePath, line, "bottom");
+      undoNotice(`Added to ${file.basename}.`, async () => {
+        if (!(await removeLine(this.app, file, line))) throw new Error("the line has changed since");
+      });
+      return true;
+    } catch (e) {
+      new Notice(`Could not add the todo: ${(e as Error).message}`);
       return false;
     }
   }

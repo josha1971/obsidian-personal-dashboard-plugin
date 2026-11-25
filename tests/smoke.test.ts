@@ -130,6 +130,7 @@ describe("plugin smoke test", () => {
     const tabs = [...listsBox(v).querySelectorAll(".pd-tab")].map((b: Element) => b.textContent);
     expect(tabs[0]).toBe("Recently modified");
     expect(tabs[1]).toMatch(/^Review Clipboard\d+$/);
+    expect(tabs[2]).toMatch(/^Todos\d+$/);
     const text = v.contentEl.textContent!;
     expect(text).not.toContain("From the garden");
     expect(text).not.toContain("Today's rhythm");
@@ -208,6 +209,38 @@ describe("plugin smoke test", () => {
     expect(ctx.plugin.settings.homeTab).toBe("recent");
   });
 
+  it("the Todos tab lists open todos oldest first, with created and note under each, and adds new ones to the on-the-fly note", async () => {
+    const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    tab(v, "Todos").click();
+    const box = listsBox(v);
+    expect(tab(v, "Todos").classList.contains("is-active")).toBe(true);
+    const texts = [...box.querySelectorAll(".pd-task-text")].map((e) => e.textContent);
+    expect(texts).toContain("Older task");
+    expect(texts.indexOf("Older task")).toBeLessThan(texts.indexOf("Newer task"));
+    expect(texts).not.toContain("Banner"); // done
+    const row = [...box.querySelectorAll(".pd-task")].find((r) => r.querySelector(".pd-task-text")!.textContent === "Older task") as HTMLElement;
+    expect(row.querySelector(".pd-task-meta")!.textContent).toMatch(/^Created .* - Task list notes$/);
+    expect(Number(tab(v, "Todos").querySelector(".pd-tab-count")!.textContent)).toBe(texts.length);
+
+    const input = box.querySelector(".pd-todo-add input") as HTMLInputElement;
+    input.value = "Renew passport"; input.dispatchEvent(new Event("input"));
+    input.dispatchEvent(new (window as any).KeyboardEvent("keydown", { key: "Enter" }));
+    await new Promise((r) => setTimeout(r, 20));
+    const todoFile = ctx.files.get("00. PRIMARY FOLDER/On The Fly Todo List.md")!;
+    expect(todoFile.content).toMatch(/^- \[ \] Renew passport ➕ \d{4}-\d{2}-\d{2}\n$/);
+    ctx.plugin.invalidate();
+    // A second one goes underneath the first.
+    await ctx.plugin.addTodo("Book dentist");
+    expect(todoFile.content.split("\n").slice(0, 2).map((l) => l.replace(/ ➕.*/, ""))).toEqual(["- [ ] Renew passport", "- [ ] Book dentist"]);
+    // Both show up, newest at the end.
+    ctx.plugin.invalidate();
+    const again = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
+    const after = [...listsBox(again).querySelectorAll(".pd-task-text")].map((e) => e.textContent);
+    expect(after.indexOf("Renew passport")).toBeLessThan(after.indexOf("Book dentist"));
+    expect(after.indexOf("Book dentist")).toBe(after.length - 1);
+    ctx.plugin.settings.homeTab = "recent";
+  });
+
   it("Home has no top button bar, and exactly the six shortcut buttons under the date", async () => {
     const v = await render(ctx.plugin, ctx.app, "personal-dashboard-home");
     expect(v.contentEl.querySelector(".pd-nav")).toBeNull();
@@ -264,7 +297,7 @@ describe("plugin smoke test", () => {
     expect(texts.indexOf("Newer task")).toBeLessThan(texts.indexOf("Older task"));
     const row = rows[texts.indexOf("Newer task")];
     const meta = row.querySelector(".pd-task-meta")!.textContent!;
-    expect(meta).toMatch(/Created .*·\s*Task list notes$/);
+    expect(meta).toMatch(/Created .* - Task list notes$/);
     expect(v.contentEl.querySelector(".pd-group-head")).toBeNull();
   });
 

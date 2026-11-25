@@ -20,6 +20,8 @@ export interface DashboardSettings {
   decisionCategory: string;
   letterCategory: string;
   writeCategory: string;
+  /** Todos added from the Todos tab on Home are written into this note. */
+  todoNotePath: string;
   /** Notes made from Home are filed here, and Home lists them (plus notes with an empty category) for review. */
   clipboardCategory: string;
   /** The category buttons on the New note box (the clipboard category is always among them). */
@@ -40,7 +42,7 @@ export interface DashboardSettings {
   /** Sections the user folded shut (by id), so they stay shut. */
   collapsedSections: string[];
   /** Which list the Home box shows. */
-  homeTab?: "recent" | "clipboard";
+  homeTab?: "recent" | "clipboard" | "todos";
   /** The Library's last layout, category and grouping, so it opens the way you left it. */
   libraryState?: { category: string; groupKey: string; dateKey: string; layout: "list" | "board" | "calendar" };
   /** One-time changes already applied to saved settings. */
@@ -60,6 +62,7 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
   letterCategory: "Letters",
   writeCategory: "Writing",
   clipboardCategory: "Clipboard",
+  todoNotePath: "00. PRIMARY FOLDER/On The Fly Todo List.md",
   newNoteCategories: ["Work", "Journal", "Clipboard"],
   quickThoughtFolder: "Quick Thoughts",
   quickThoughtCategory: "Quick Thought",
@@ -77,6 +80,7 @@ export const HOME_SECTIONS: [string, string][] = [
   ["favorites", "Favorites"],
   ["clipboard", "Review Clipboard tab"],
   ["recentLogs", "Recently modified tab"],
+  ["todos", "Todos tab"],
 ];
 
 export class DashboardSettingTab extends PluginSettingTab {
@@ -138,6 +142,10 @@ export class DashboardSettingTab extends PluginSettingTab {
       .setName("New note category buttons")
       .setDesc("Comma separated. These are the buttons on the New note box. The Clipboard category is always included and is the one chosen to start with.")
       .addText((t) => t.setValue(s.newNoteCategories.join(", ")).onChange(async (v) => { s.newNoteCategories = v.split(",").map((x) => x.trim()).filter(Boolean); await save(); }));
+    new Setting(containerEl)
+      .setName("On-the-fly todo note")
+      .setDesc("Todos you add from the Todos tab on Home are written into this note, at the bottom. It is created if it does not exist.")
+      .addText((t) => t.setValue(s.todoNotePath).onChange(async (v) => { s.todoNotePath = v.trim() || DEFAULT_SETTINGS.todoNotePath; await save(); }));
     new Setting(containerEl)
       .setName("Quick Thoughts folder")
       .setDesc("Add Quick Thought saves notes here. See all Quick Thoughts opens the note called All Quick Thoughts inside it.")

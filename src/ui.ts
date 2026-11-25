@@ -102,10 +102,9 @@ export function renderTaskRow(parent: HTMLElement, t: TaskItem, plugin: Dashboar
   if (t.info.duration) chip(meta, formatDuration(t.info.duration));
   for (const tag of t.info.tags) chip(meta, `#${tag}`, "is-tag");
   const made = taskCreatedKey(t).slice(0, 10);
-  const when = meta.createSpan({ text: `Created ${friendlyDate(made, today)}`, cls: "pd-task-note" });
+  const when = meta.createSpan({ text: `Created ${friendlyDate(made, today)}${showNote ? " - " : ""}`, cls: "pd-task-note pd-task-when" });
   setTooltip(when, `This checklist item was created on ${made}`, { delay: 400 });
   if (showNote) {
-    meta.createSpan({ text: "·", cls: "pd-task-note" });
     const note = meta.createSpan({ text: t.file.basename, cls: "pd-task-note pd-task-notename" });
     setTooltip(note, `In ${t.file.path}`, { delay: 400 });
   }
